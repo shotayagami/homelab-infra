@@ -108,15 +108,23 @@ gitleaks version
 
 #### Pre-commit hook 連携
 
-`.git/hooks/pre-commit` で `gitleaks protect --staged` を呼び、staged content から機微情報を検出。
+`.git/hooks/pre-commit` で `gitleaks git --pre-commit --staged --redact --no-banner` を呼び、staged content から機微情報を検出。
 
-リポジトリには本ガイドの末尾に hook サンプルあり。本リポジトリでも採用済。
+**重要 (v8 移行ポイント)**:
+- v7 までは `gitleaks protect --staged` だったが、v8 で `protect` サブコマンドが廃止
+- v8 では `gitleaks git --pre-commit --staged` が正式
+- `gitleaks detect` も v8.30 では `git`/`dir`/`stdin` に分割
 
 #### 既存履歴のスキャン（過去 commit を全件チェック）
 
 ```bash
 cd /home/shotayagami/homelab-infra
-gitleaks detect --redact --verbose
+
+# Git 履歴全部
+gitleaks git --redact --no-banner --log-opts="--all"
+
+# ワーキングディレクトリ (未 commit 含む)
+gitleaks dir --redact --no-banner .
 ```
 
 漏洩を発見した場合の対処:
@@ -195,7 +203,22 @@ zabbix-configs/   @<monitoring-owner>
 
 ### 2026-05-15: gitleaks 導入
 
-- GitHub Secret scanning が Private repo (Free) で使えないため、OSS の **gitleaks** を導入
-- `.git/hooks/pre-commit` を更新: `gitleaks protect --staged` で staged 内容を検査、検出時は commit ブロック
+- GitHub Secret scanning が Private repo (Free) で使えないため、OSS の **gitleaks v8.30.1** を `/usr/local/bin/` に導入
+- `.git/hooks/pre-commit` を v8 syntax (`gitleaks git --pre-commit --staged`) で実装
+- 全履歴 (3 commits, 82 KB) を `gitleaks git --log-opts=--all` でスキャン → **leaks found: 0** 確認
+- 偽 secret (AWS key / GitHub PAT / Slack webhook) で commit 試行 → hook が正しく block することを確認
 - gitleaks 未インストール時は簡易 regex fallback で動作
 - 業務観点では「ローカル完結 + push 後の GitHub 側保護なし」を理解した上で運用
+
+### gitleaks v7 → v8 migration 注意
+
+v7 と v8 でコマンド体系が大きく変わったため、古い情報の hook 設定例は動かない:
+
+| v7 | v8 |
+|---|---|
+| `gitleaks protect --staged` | `gitleaks git --pre-commit --staged` |
+| `gitleaks detect` (デフォルト = git) | `gitleaks git` |
+| `gitleaks detect --no-git` | `gitleaks dir` |
+| (stdin パイプ) | `gitleaks stdin` |
+
+`--no-banner` も v8 で追加されたフラグ。`--redact` は v7/v8 共通。
