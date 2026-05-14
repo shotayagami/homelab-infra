@@ -1,0 +1,44 @@
+#!/bin/bash
+# Pre-commit hook: 機微情報の混入を機械的に検出
+#
+# このファイルはリポジトリで管理される「正本」。
+# 各 clone でアクティブにするには:
+#   bash scripts/install-hooks.sh
+# を実行して .git/hooks/pre-commit に symlink を張る。
+#
+# Primary: gitleaks v8 (gitleaks git --pre-commit --staged)
+# Fallback: 簡易 regex (gitleaks 未インストール時)
+set -e
+
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks git --pre-commit --staged --redact --no-banner 2>&1; then
+    echo "" >&2
+    echo "ERROR: gitleaks が機微情報の混入を検出しました。" >&2
+    echo "  対処: 該当箇所を除去するか、誤検出なら .gitleaksignore で allowlist 化。" >&2
+    echo "  バイパス (非推奨): git commit --no-verify" >&2
+    exit 1
+  fi
+else
+  echo "WARN: gitleaks がインストールされていません、簡易 regex に fallback します。" >&2
+  echo "  推奨: https://github.com/gitleaks/gitleaks" >&2
+
+  PATTERN_KV='(api[_-]?key|password|passwd|token|secret|bearer)[[:space:]]*[:=][[:space:]]*["'\''[:space:]]*[A-Za-z0-9+/=_-]{16,}'
+  PATTERN_WEBHOOK='https?://[^[:space:]"]*/api/webhooks/[0-9]+/[A-Za-z0-9_-]{20,}'
+  STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -vE '^\.env\.example$|^docs/|^\.git/hooks/|^scripts/git-hooks/' || true)
+  found=0
+  while IFS= read -r f; do
+    if [[ -f "$f" ]] && grep -qE "$PATTERN_KV|$PATTERN_WEBHOOK" "$f" 2>/dev/null; then
+      echo "ERROR: 機微情報らしき内容: $f" >&2
+      grep -nE "$PATTERN_KV|$PATTERN_WEBHOOK" "$f" 2>/dev/null | head -3 | sed 's/^/      /' >&2
+      found=1
+    fi
+  done <<<"$STAGED"
+  if [[ $found -eq 1 ]]; then
+    echo "" >&2
+    echo "  対処: 機微情報を除去するか .gitignore で除外してください。" >&2
+    echo "  バイパス: git commit --no-verify" >&2
+    exit 1
+  fi
+fi
+
+exit 0
