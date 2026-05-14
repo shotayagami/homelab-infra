@@ -27,6 +27,10 @@
 │   ├── homelab-git-workflow.md        ← Git 運用ルール
 │   └── github-post-setup.md           ← GitHub 設定の継続作業
 ├── scripts/                      ← デプロイ・運用スクリプト
+│   ├── git-hooks/                     ← Git hooks の正本（install-hooks.sh で symlink）
+│   │   └── pre-commit
+│   ├── install-hooks.sh
+│   ├── github-create-initial-issues.sh
 │   ├── proxmox-deploy-puter-cloudflare-access.sh
 │   ├── proxmox-setup-extra-storage-sda-sdb.sh
 │   └── proxmox-zabbix-set-host-location.sh
@@ -49,10 +53,20 @@
 4. **環境変更時は docs を同じ commit で更新** — コードとドキュメントの乖離を防ぐ
 5. **平文の認証情報は会話・ドキュメントにも残さない** — 必要なら `<masked>` 表記
 
+## 初期セットアップ（clone 直後）
+
+```bash
+bash scripts/install-hooks.sh   # pre-commit hook を有効化 (gitleaks 連携)
+```
+
+詳細は [docs/homelab-git-workflow.md](docs/homelab-git-workflow.md) §6 を参照。
+
 ## 主要スクリプト
 
 | Script | 用途 |
 |---|---|
+| [scripts/install-hooks.sh](scripts/install-hooks.sh) | `scripts/git-hooks/*` を `.git/hooks/` に symlink (clone 後の初期化) |
+| [scripts/github-create-initial-issues.sh](scripts/github-create-initial-issues.sh) | 残作業を GitHub Issues として一括登録（冪等） |
 | [scripts/proxmox-deploy-puter-cloudflare-access.sh](scripts/proxmox-deploy-puter-cloudflare-access.sh) | Puter LXC + Cloudflare Tunnel デプロイ |
 | [scripts/proxmox-setup-extra-storage-sda-sdb.sh](scripts/proxmox-setup-extra-storage-sda-sdb.sh) | 追加ディスク (store-sda/sdb) セットアップ |
 | [scripts/proxmox-zabbix-set-host-location.sh](scripts/proxmox-zabbix-set-host-location.sh) | Zabbix 全ホストの inventory に座標を API 一括設定 |

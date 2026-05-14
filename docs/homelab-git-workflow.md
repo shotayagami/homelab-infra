@@ -224,18 +224,20 @@ git push --tags
 
 ### Pre-commit hook で機械的にブロック
 
+正本は `scripts/git-hooks/pre-commit`（gitleaks v8 ベース、未インストール時は簡易 regex に fallback）。
+`.git/hooks/` は Git の追跡対象外なので、clone 直後は無効。以下を一度実行して symlink を張る。
+
 ```bash
-cat > .git/hooks/pre-commit <<'EOF'
-#!/bin/bash
-# 機微情報らしき長い文字列が含まれていれば commit を止める
-if git diff --cached --name-only | xargs grep -lE '(api_key|password|token|secret|webhook).*=.*[a-zA-Z0-9]{20,}' 2>/dev/null; then
-  echo "ERROR: 認証情報らしき文字列がコミット対象に含まれています"
-  echo "  git diff --cached --name-only で対象を確認してください"
-  exit 1
-fi
-EOF
-chmod +x .git/hooks/pre-commit
+cd ~/homelab-infra
+bash scripts/install-hooks.sh
 ```
+
+実行内容:
+- `scripts/git-hooks/pre-commit` → `.git/hooks/pre-commit` に symlink
+- gitleaks のインストール有無を確認、未導入なら導入手順を案内
+- 既存 hook が実体ファイルなら `.bak` に退避してから置換（冪等）
+
+検出ロジックの実装は `scripts/git-hooks/pre-commit` を参照。バイパスが必要な場合は `git commit --no-verify`（非推奨）。
 
 ## 7. Commit Message の書き方（業務観点）
 
