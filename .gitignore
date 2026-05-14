@@ -1,0 +1,36 @@
+# 認証情報
+.env
+*.env
+*.tunnel_id
+*.tunnel_token
+*.pem
+*.key
+*.crt
+*.pfx
+*-credentials
+.dns-cert-password
+.zabbix-db-credentials
+.ntfy-credentials
+
+# OS
+.DS_Store
+*.swp
+*.swo
+*~
+
+# エディタ
+.vscode/
+.idea/
+
+# 一時ファイル
+/tmp/
+*.bak
+*.bak.*
+
+# Zabbix configuration export は機微情報（SMTP password, webhook URL 等）を含むため
+# Git 管理しない。raw export は別途オフラインで保管。
+# サニタイズ済みのスナップショットを残したい場合は zabbix-configs/sanitized/ に置く。
+zabbix-configs/*
+!zabbix-configs/.gitkeep
+!zabbix-configs/README.md
+!zabbix-configs/sanitized/
