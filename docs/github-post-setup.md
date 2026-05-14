@@ -77,24 +77,58 @@ git show v1.0.0
 
 GitHub 標準機能で、commit / push される内容を機械的にスキャンし、API token・秘密鍵などのパターンを検出。
 
-### 設定場所
+### Plan による可用性の制限（2026 時点）
 
-`https://github.com/<user>/<repo>/settings/security_analysis`
+| 機能 | Public repo | Private (Free/Pro) | Private (Advanced Security 有料) |
+|---|---|---|---|
+| Dependabot alerts/updates | 無料 | **無料** | 有料 |
+| Secret scanning | 無料 | **不可** | 有料 |
+| Push protection | 無料 | **不可** | 有料 |
 
-### 有効化推奨項目
+**本リポジトリ (Private + 個人 Free アカウント) では Secret scanning は使えない**。
+Settings → Advanced Security に Dependabot 系のみ表示されることが正常な挙動。
 
-- **Secret scanning**: ✓
-  - GitHub が認証情報パターンを検出 → 通知
-- **Push protection**: ✓（強く推奨）
-  - 既知のシークレットパターンを含む push を**自動拒否**
-  - 例えば GitHub PAT、Slack token、AWS access key などが該当
-- **Dependabot alerts**: 任意（コード依存ライブラリの脆弱性検知。本リポジトリは依存少ないので優先度低）
+### 代替策: gitleaks + pre-commit hook（推奨）
+
+GitHub の Secret scanning 相当を**ローカルで完結**させる OSS。push 前に検出することで、GitHub 側に到達させない設計。
+
+#### インストール
+
+```bash
+TAG=$(curl -sI -L -o /dev/null -w "%{url_effective}" https://github.com/gitleaks/gitleaks/releases/latest | sed 's|.*/||')
+VER=${TAG#v}
+URL="https://github.com/gitleaks/gitleaks/releases/download/${TAG}/gitleaks_${VER}_linux_x64.tar.gz"
+
+cd /tmp
+wget -q "$URL" -O gitleaks.tar.gz
+tar -xzf gitleaks.tar.gz gitleaks
+sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+gitleaks version
+```
+
+#### Pre-commit hook 連携
+
+`.git/hooks/pre-commit` で `gitleaks protect --staged` を呼び、staged content から機微情報を検出。
+
+リポジトリには本ガイドの末尾に hook サンプルあり。本リポジトリでも採用済。
+
+#### 既存履歴のスキャン（過去 commit を全件チェック）
+
+```bash
+cd /home/shotayagami/homelab-infra
+gitleaks detect --redact --verbose
+```
+
+漏洩を発見した場合の対処:
+1. 該当認証情報を**即時 rotate / 無効化**
+2. 履歴から削除 (`git filter-repo`)、ただし他人が clone 済なら遡及不可能
+3. push 後の漏洩は実質「漏洩」確定として扱う
 
 ### 業務観点
 
-- **Public リポジトリでは必須レベル**: シークレット流出は即座にクローン→悪用される
-- **Private でも有効化推奨**: 内部脅威・誤操作対策、また将来 public 化する場合の予防
-- 本リポジトリは Private だが、`.git` 履歴に過去誤って混入させた場合のラストガード
+- **Public リポジトリでは GitHub の Secret scanning が必須レベル**: シークレット流出は即座にクローン → 悪用される
+- **Private + GHAS なら GitHub の機能を活用**: 業務環境では費用対効果あり
+- **Private + Free では gitleaks + pre-commit で代替**: ローカル運用で機能等価性は十分
 
 ## 5. その他の発展
 
@@ -155,6 +189,13 @@ zabbix-configs/   @<monitoring-owner>
 ### 後日（手動 UI 作業）
 
 - [ ] Branch protection rules: 一旦 OFF のまま（自分しか触らないため）
-- [ ] Secret scanning + Push protection: 有効化推奨（業務本番化時の必須項目）
+- [x] ~~Secret scanning + Push protection 有効化~~ → **Private + Free では使用不可**、gitleaks で代替済
 - [ ] Phase 4-B Issue 化（残作業の可視化）
 - [ ] Phase 6-E (credential rotation) Issue 化
+
+### 2026-05-15: gitleaks 導入
+
+- GitHub Secret scanning が Private repo (Free) で使えないため、OSS の **gitleaks** を導入
+- `.git/hooks/pre-commit` を更新: `gitleaks protect --staged` で staged 内容を検査、検出時は commit ブロック
+- gitleaks 未インストール時は簡易 regex fallback で動作
+- 業務観点では「ローカル完結 + push 後の GitHub 側保護なし」を理解した上で運用
