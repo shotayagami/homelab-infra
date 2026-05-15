@@ -97,17 +97,17 @@ Admin user の 3 media に同時配信
 
 ## ロードマップ
 
-完了済（v1.0.0）:
-- Phase 1-3: Zabbix 構築 + agent 配布
-- Phase 4-A: DNS サービス監視
-- Phase 4-C: step-ca 監視
-- Phase 5: 通知 3 系統 + アクション
-- Phase 6: バックアップ + Config export + docs
+完了済:
+- Phase 1-3: Zabbix 構築 + agent 配布 (v1.0.0)
+- Phase 4-A: DNS サービス監視 (v1.0.0)
+- Phase 4-C: step-ca 監視 (v1.0.0)
+- Phase 5: 通知 3 系統 + アクション (v1.0.0)
+- Phase 6: バックアップ + Config export + docs (v1.0.0)
+- Phase 4-B: Nextcloud 監視 (2026-05-15、ntfy/Discord/Mailgun 3 系統に実 trigger 配信を実証)
+- Phase 6-E: クレデンシャル rotation (2026-05-15、Mailgun/Discord/ntfy/Zabbix Admin/DNS PFX)
 
 未完了:
-- Phase 4-B: Nextcloud 監視（テンプレ適用、admin token 発行待ち）
-- Phase 6-E: クレデンシャル rotation（Mailgun password / Discord webhook / ntfy token）
-- dns2 の DoT/DoH 再有効化（Technitium 15.x の cert load 不具合の追跡）
+- dns2 の DoT/DoH 再有効化（Technitium 15.x の cert load 不具合の追跡、Issue #3）
 
 ## ライセンス
 

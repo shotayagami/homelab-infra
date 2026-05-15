@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
 # Nextcloud LXC (host id 10687, 192.168.11.62) に Zabbix の
-# 「Nextcloud server by HTTP」テンプレートを適用し、必要な macro を設定する。
+# 「Nextcloud by HTTP」テンプレートを適用し、必要な macro を設定する。
 #
 # 前提:
-#   - Zabbix 7.0 に「Nextcloud server by HTTP」テンプレートが import 済
+#   - Zabbix 7.0 に「Nextcloud by HTTP」テンプレートが import 済
 #     (Templates → 検索: "Nextcloud" → 標準テンプレに含まれる)
 #   - Nextcloud 側で monitoring 用ユーザ + app password を生成済
 #     Settings → Security → App passwords → "zabbix-monitor" などの名前で発行
@@ -23,13 +23,19 @@
 #
 # 履歴:
 #   2026-05-15 初版 (Issue #1 / Phase 4-B)
+#   2026-05-15 テンプレ名/macro 名を Zabbix 7.0 LTS 同梱版 (templates/app/nextcloud) に合わせて修正
+#              - Nextcloud server by HTTP → Nextcloud by HTTP
+#              - URL → ADDRESS + SCHEMA に分割
+#              - USER → USER.NAME, PASSWORD → USER.PASSWORD
+#              - SSL_VERIFY 系はテンプレに無いため削除 (Zabbix server 側で CA trust が必要)
 
 set -euo pipefail
 
 ZBX_URL="http://192.168.11.55/api_jsonrpc.php"
 NC_HOST_NAME="nextcloud"            # Zabbix 側のホスト名
-NC_URL="https://nextcloud.home.yagamin.net"
-TEMPLATE_NAME="Nextcloud server by HTTP"
+NC_SCHEMA="https"
+NC_ADDRESS="nextcloud.home.yagamin.net"
+TEMPLATE_NAME="Nextcloud by HTTP"
 
 : "${NC_USER:?env NC_USER (Nextcloud monitoring user) を設定してください}"
 : "${NC_APP_PASS:?env NC_APP_PASS (Nextcloud app password) を設定してください}"
@@ -70,14 +76,13 @@ echo "template '$TEMPLATE_NAME' → templateid=$TEMPLATEID"
 # Macros (upsert) - 既存リスト取得 → マージ → 一括 update
 # ─────────────────────────────────────────────
 declare -A NEW_MACROS=(
-  ["{\$NEXTCLOUD.URL}"]="$NC_URL"
-  ["{\$NEXTCLOUD.USER}"]="$NC_USER"
-  ["{\$NEXTCLOUD.PASSWORD}"]="$NC_APP_PASS"
-  ["{\$NEXTCLOUD.HTTP.SSL_VERIFY_PEER}"]="0"
-  ["{\$NEXTCLOUD.HTTP.SSL_VERIFY_HOST}"]="0"
+  ["{\$NEXTCLOUD.ADDRESS}"]="$NC_ADDRESS"
+  ["{\$NEXTCLOUD.SCHEMA}"]="$NC_SCHEMA"
+  ["{\$NEXTCLOUD.USER.NAME}"]="$NC_USER"
+  ["{\$NEXTCLOUD.USER.PASSWORD}"]="$NC_APP_PASS"
 )
 declare -A SECRET_TYPE=(
-  ["{\$NEXTCLOUD.PASSWORD}"]="1"     # 1 = Secret text
+  ["{\$NEXTCLOUD.USER.PASSWORD}"]="1"     # 1 = Secret text
 )
 
 EXISTING_JSON=$(call usermacro.get "{\"hostids\":[\"$HOSTID\"],\"output\":[\"hostmacroid\",\"macro\",\"value\",\"type\"]}" | jq -c '.result')
@@ -90,10 +95,14 @@ for macro in "${!NEW_MACROS[@]}"; do
 
   if [[ -n "$existing_id" ]]; then
     echo "  UPDATE: $macro (id=$existing_id, type=$mtype)"
-    call usermacro.update "{\"hostmacroid\":\"$existing_id\",\"value\":$(jq -Rs . <<<"$value"),\"type\":\"$mtype\"}" | jq -c '.result // .error'
+    params=$(jq -nc --arg id "$existing_id" --arg v "$value" --arg t "$mtype" \
+      '{hostmacroid:$id, value:$v, type:($t|tonumber)}')
+    call usermacro.update "$params" | jq -c '.result // .error'
   else
     echo "  CREATE: $macro (type=$mtype)"
-    call usermacro.create "{\"hostid\":\"$HOSTID\",\"macro\":$(jq -Rs . <<<"$macro"),\"value\":$(jq -Rs . <<<"$value"),\"type\":\"$mtype\"}" | jq -c '.result // .error'
+    params=$(jq -nc --arg hid "$HOSTID" --arg m "$macro" --arg v "$value" --arg t "$mtype" \
+      '{hostid:$hid, macro:$m, value:$v, type:($t|tonumber)}')
+    call usermacro.create "$params" | jq -c '.result // .error'
   fi
 done
 
