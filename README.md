@@ -71,6 +71,7 @@ bash scripts/install-hooks.sh   # pre-commit hook を有効化 (gitleaks 連携)
 | [scripts/proxmox-setup-extra-storage-sda-sdb.sh](scripts/proxmox-setup-extra-storage-sda-sdb.sh) | 追加ディスク (store-sda/sdb) セットアップ |
 | [scripts/proxmox-zabbix-set-host-location.sh](scripts/proxmox-zabbix-set-host-location.sh) | Zabbix 全ホストの inventory に座標を API 一括設定 |
 | [scripts/proxmox-zabbix-apply-nextcloud-template.sh](scripts/proxmox-zabbix-apply-nextcloud-template.sh) | Phase 4-B: Nextcloud HTTP テンプレ + macros を API 適用 (Issue #1) |
+| [scripts/proxmox-deploy-zabbix-cloudflare-access.sh](scripts/proxmox-deploy-zabbix-cloudflare-access.sh) | Zabbix UI を CF Tunnel + CF Access で外部公開 (Issue #7) |
 
 ## 通知経路
 
