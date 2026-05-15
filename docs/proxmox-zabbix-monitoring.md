@@ -364,6 +364,47 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 - LAN 内から `192.168.11.55:80` に直接アクセス可能
 - → step-ca 証明書で nginx を HTTPS 化する作業を Issue #8 で別途トラッキング (Nextcloud LXC 108 と同型)
 
+### 2026-05-15: Zabbix nginx を step-ca 証明書で内部 HTTPS 化 (Issue #8)
+
+#### 動機
+- Issue #7 で外部公開 (CF Tunnel + Access) を実現したが、LAN 内 `192.168.11.55:80` は平文のまま
+- 他 LXC が侵害された場合の横展開耐性を上げるため、Nextcloud と同型の step-ca cert で nginx を HTTPS 化
+
+#### 構成
+```
+LAN client  ──HTTP 80──► 192.168.11.55:80  ─301─► https://zabbix.home.yagamin.net
+LAN client  ──HTTPS────► 192.168.11.55:443 (step-ca cert) ──► Zabbix php
+CF Tunnel   ──HTTP 80──► 127.0.0.1:80      (loopback only)  ──► Zabbix php
+```
+
+#### 反映内容
+
+| 項目 | 詳細 |
+|---|---|
+| 内部 DNS | Technitium に A レコード `zabbix.home.yagamin.net → 192.168.11.55` 追加 (dns/dns2 両系) |
+| step CLI | LXC 190 に smallstep deb 導入、CA bootstrap (URL `https://step-ca.home.yagamin.net`, fingerprint `31b8...`) |
+| 証明書 | `step ca certificate` で `zabbix.home.yagamin.net` 用、SAN `192.168.11.55` 込み、寿命 30 日 |
+| 証明書配置 | `/etc/nginx/ssl/zabbix.{crt,key,ca.crt}` (key は 0600) |
+| nginx 設定 | `/etc/nginx/conf.d/zabbix.conf` の symlink を `.symlink.bak` に退避し、3 server block の実体ファイルへ:<br>1. `listen 127.0.0.1:80` (CF Tunnel 専用、平文 OK)<br>2. `listen 192.168.11.55:80` → 301 to `https://zabbix.home.yagamin.net`<br>3. `listen 443 ssl http2` (step-ca cert) |
+| 自動更新 daemon | `step-renew-zabbix.service` (systemd) で 5 日前 (`--expires-in 120h`) renewal + nginx reload。`ProtectHome=read-only` 必須 ([[proxmox-step-ca-nextcloud]] と同じ罠) |
+
+#### 詰まりポイント
+- **nginx 1.24.0 (LXC 190 同梱) は `http2 on;` 未対応** → 旧 syntax `listen 443 ssl http2;` で記述
+- **`systemctl reload nginx` では既存 socket (0.0.0.0:80) を引きずる** → bind 構成が変わるケースは `systemctl restart nginx` 必須
+- ssh 経由の heredoc 入れ子 quote で破綻 → ローカルにファイル書いて `cat | ssh ... 'cat > /tmp/xxx'` → `pct push` の 2 段階に分けると安全
+
+#### 動作確認 (3 経路)
+
+| 経路 | 結果 |
+|---|---|
+| CF Tunnel loopback → `http://127.0.0.1/` | `HTTP/1.1 200 OK` (Zabbix 直接応答) |
+| LAN HTTP → `http://192.168.11.55/` | `HTTP/1.1 301 Moved Permanently` (Location: https://zabbix.home.yagamin.net/) |
+| LAN HTTPS → `https://zabbix.home.yagamin.net/` | `HTTP/2 200` (TLS 終端、step-ca cert) |
+| 外部 → `https://zabbix.yagamin.net/` (CF Tunnel 経由) | dashboard 到達確認 |
+
+#### 残課題
+- `/etc/nginx/conf.d/zabbix.conf.symlink.bak` は退避ファイル、package 更新時の rollback 起点として保持
+
 ### 2026-05-15: 地理マップ (Geomap) widget の調査
 
 - **用途**: ホスト Inventory に latitude/longitude を設定すると、リアルマップ上にホストをプロット
