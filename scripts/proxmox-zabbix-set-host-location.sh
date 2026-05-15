@@ -22,11 +22,28 @@ set -euo pipefail
 
 ZBX_URL="http://192.168.11.55/api_jsonrpc.php"
 
-read -rsp "Zabbix Admin password: " ZBX_PASS; echo
-AUTH=$(curl -sS -X POST -H "Content-Type: application/json-rpc" \
-  -d "{\"jsonrpc\":\"2.0\",\"method\":\"user.login\",\"params\":{\"username\":\"Admin\",\"password\":\"$ZBX_PASS\"},\"id\":1}" \
-  "$ZBX_URL" | jq -r '.result')
-unset ZBX_PASS
+# .env を source して ZBX_API_TOKEN を拾う (MFA 強制環境では token 必須)
+ENV_FILE="${ENV_FILE:-${HOME}/.env}"
+if [[ -f "$ENV_FILE" ]]; then
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+fi
+
+if [[ -n "${ZBX_API_TOKEN:-}" ]]; then
+  AUTH="$ZBX_API_TOKEN"
+  AUTH_MODE="token"
+  echo "Auth: ZBX_API_TOKEN from $ENV_FILE"
+else
+  echo "Auth: user.login fallback (ZBX_API_TOKEN 未設定)"
+  echo "  ※ Zabbix Admin に MFA 有効な場合は user.login の session が即 invalidate されます"
+  read -rsp "Zabbix Admin password: " ZBX_PASS; echo
+  AUTH=$(curl -sS -X POST -H "Content-Type: application/json-rpc" \
+    -d "{\"jsonrpc\":\"2.0\",\"method\":\"user.login\",\"params\":{\"username\":\"Admin\",\"password\":\"$ZBX_PASS\"},\"id\":1}" \
+    "$ZBX_URL" | jq -r '.result')
+  unset ZBX_PASS
+  AUTH_MODE="session"
+fi
+[[ -n "$AUTH" && "$AUTH" != "null" ]] || { echo "Zabbix 認証失敗" >&2; exit 1; }
 
 # 設定する座標（変更する場合はここを編集）
 LOCATION="<masked-location>"
@@ -50,8 +67,10 @@ for HID in $HIDS; do
     "$ZBX_URL" | jq -c .
 done
 
-# Logout
-curl -sS -X POST -H "Content-Type: application/json-rpc" -H "Authorization: Bearer $AUTH" \
-  -d '{"jsonrpc":"2.0","method":"user.logout","params":[],"id":1}' "$ZBX_URL" >/dev/null
+# session のときだけ logout (API token は永続なので logout 不要)
+if [[ "$AUTH_MODE" == "session" ]]; then
+  curl -sS -X POST -H "Content-Type: application/json-rpc" -H "Authorization: Bearer $AUTH" \
+    -d '{"jsonrpc":"2.0","method":"user.logout","params":[],"id":1}' "$ZBX_URL" >/dev/null
+fi
 
 echo Done.
