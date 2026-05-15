@@ -329,6 +329,41 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 - NC33 系で `-dev.0` 末尾の app バージョンが多数 → nightly/RC channel? 安定版運用への切替検討
 - Zabbix server が `nextcloud.home.yagamin.net` への HTTPS 接続に成功している = 何らかの形で step-ca CA を信頼しているか、HTTP agent 側の SSL_VERIFY が無効。詳細は未確認 (調査タスク化候補)
 
+### 2026-05-15: Zabbix UI を CF Tunnel + Access で外部公開 (Issue #7)
+
+#### 構成
+```
+[Browser] --HTTPS--> [CF Edge] --HTTPS--> [cloudflared in LXC 190] --HTTP--> [nginx :80] --> Zabbix
+                              ↑
+                       CF Access (One-time PIN) で先に email 認証
+```
+
+- 公開 FQDN: `zabbix.yagamin.net`
+- Tunnel: 名前 `zabbix` (id `edbe2625-...`)、CF Dashboard で事前作成済の tunnel をスクリプトが API 経由で発見・利用
+- Access app `Zabbix (zabbix.yagamin.net)`、policy `Allow listed emails`
+- Access 許可 email domain: `nekomin.jp / yagamin.net` (`.env` の `CF_ACCESS_INCLUDE_EMAIL_DOMAINS`)
+- cloudflared を LXC 190 内 systemd service として常駐
+
+#### 成果物
+- [scripts/proxmox-deploy-zabbix-cloudflare-access.sh](../scripts/proxmox-deploy-zabbix-cloudflare-access.sh) — Tunnel/Access/DNS を CF API で冪等構成、`.env` を読み込んで `bash` 1 発で完了
+- puter スクリプトと同じヘルパー (`cf_api`, `ensure_access_app`, `ensure_access_policy`) を移植
+
+#### 2FA (TOTP) 追加
+- システム全体で MFA 有効化 + method `ZABBIX YAGAMIN.COM` (TOTP/SHA-1/6 桁)
+- User group `Zabbix administrators` に MFA method を紐付け
+  - **UI からは「多要素認証: Disabled」のラベルがクリックできず編集不可だった**
+  - `usergroup.update` API で `mfaid` と `mfa_status` を直接更新して回避:
+    ```json
+    {"usrgrpid":"7","mfaid":"2","mfa_status":1}
+    ```
+- Admin で再ログインすると TOTP QR + Base32 シークレット表示 → 認証アプリ登録 + 1Password に秘密鍵保管 (lock-out 保険)
+- 以降は password + 6 桁コードの 2 段認証
+
+#### Defense-in-depth の残課題 (Issue #8)
+- 経路最後の `cloudflared -> nginx:80` は同一 LXC 内 loopback とはいえ HTTP
+- LAN 内から `192.168.11.55:80` に直接アクセス可能
+- → step-ca 証明書で nginx を HTTPS 化する作業を Issue #8 で別途トラッキング (Nextcloud LXC 108 と同型)
+
 ### 2026-05-15: 地理マップ (Geomap) widget の調査
 
 - **用途**: ホスト Inventory に latitude/longitude を設定すると、リアルマップ上にホストをプロット
