@@ -405,6 +405,15 @@ CF Tunnel   ──HTTP 80──► 127.0.0.1:80      (loopback only)  ──► 
 #### 残課題
 - `/etc/nginx/conf.d/zabbix.conf.symlink.bak` は退避ファイル、package 更新時の rollback 起点として保持
 
+#### Issue #8 完了後の修正 (Issue #10 作業中に発見)
+- **cert に hostname の SAN が抜けていた**: 初回の `step ca certificate zabbix.home.yagamin.net /etc/nginx/ssl/zabbix.{crt,key} --san 192.168.11.55` では、positional 引数の subject (CN) が SAN に自動追加されない挙動。curl は RFC 6125 で SAN 必須なので "no alternative certificate subject name matches" で TLS 検証失敗。
+- **対処**: `--san zabbix.home.yagamin.net --san 192.168.11.55` を**両方明示**して再発行。step-renew-zabbix.service も restart。
+- **教訓**: step CLI で cert を発行する際は subject (CN) も常に `--san` で明示すること。
+
+#### admin-vm への CA 信頼インストール (Issue #10 動作確認のため実施済)
+- `/etc/nginx/ssl/ca.crt` を `/usr/local/share/ca-certificates/home-yagamin-ca.crt` に配置 → `sudo update-ca-certificates`
+- 同じ Root CA で署名された Nextcloud 等の他サービスにも curl が `-k` なしでアクセス可能になった
+
 #### クライアント側の追加対応 (任意、未実施)
 - step-ca の Root CA は Windows / macOS の信頼ストアに**入っていない**ため、ブラウザは「保護されていない接続」と表示する (実際は TLS だが chain 検証不可)
 - Edge の InPrivate モードは特にこれを「HTTPS 非サポート」扱いに見せる
