@@ -41,14 +41,29 @@ TEMPLATE_NAME="Nextcloud by HTTP"
 : "${NC_APP_PASS:?env NC_APP_PASS (Nextcloud app password) を設定してください}"
 
 # ─────────────────────────────────────────────
-# Login
+# Auth: ZBX_API_TOKEN を優先、無ければ user.login fallback
 # ─────────────────────────────────────────────
-read -rsp "Zabbix Admin password: " ZBX_PASS; echo
-AUTH=$(curl -sS -X POST -H "Content-Type: application/json-rpc" \
-  -d "{\"jsonrpc\":\"2.0\",\"method\":\"user.login\",\"params\":{\"username\":\"Admin\",\"password\":\"$ZBX_PASS\"},\"id\":1}" \
-  "$ZBX_URL" | jq -r '.result')
-unset ZBX_PASS
-[[ -n "$AUTH" && "$AUTH" != "null" ]] || { echo "Zabbix 認証失敗"; exit 1; }
+ENV_FILE="${ENV_FILE:-${HOME}/.env}"
+if [[ -f "$ENV_FILE" ]]; then
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+fi
+
+if [[ -n "${ZBX_API_TOKEN:-}" ]]; then
+  AUTH="$ZBX_API_TOKEN"
+  AUTH_MODE="token"
+  echo "Auth: ZBX_API_TOKEN from $ENV_FILE"
+else
+  echo "Auth: user.login fallback (ZBX_API_TOKEN 未設定)"
+  echo "  ※ Zabbix Admin に MFA 有効な場合は user.login の session が即 invalidate されます"
+  read -rsp "Zabbix Admin password: " ZBX_PASS; echo
+  AUTH=$(curl -sS -X POST -H "Content-Type: application/json-rpc" \
+    -d "{\"jsonrpc\":\"2.0\",\"method\":\"user.login\",\"params\":{\"username\":\"Admin\",\"password\":\"$ZBX_PASS\"},\"id\":1}" \
+    "$ZBX_URL" | jq -r '.result')
+  unset ZBX_PASS
+  AUTH_MODE="session"
+fi
+[[ -n "$AUTH" && "$AUTH" != "null" ]] || { echo "Zabbix 認証失敗" >&2; exit 1; }
 
 call() {
   local method="$1" params="$2"
@@ -57,7 +72,10 @@ call() {
 }
 
 cleanup() {
-  call user.logout '[]' >/dev/null 2>&1 || true
+  # session のときだけ logout (API token は永続)
+  if [[ "${AUTH_MODE:-}" == "session" ]]; then
+    call user.logout '[]' >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT
 

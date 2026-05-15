@@ -57,7 +57,12 @@
 
 ```bash
 bash scripts/install-hooks.sh   # pre-commit hook を有効化 (gitleaks 連携)
+cp .env.example .env             # 値を埋める (CF/Zabbix tokens)
 ```
+
+`ZBX_API_TOKEN` は Zabbix UI → ユーザー → API トークン から発行 (User=Admin, 期限なし推奨)。
+Zabbix Admin に MFA 有効な環境では `user.login` の session が即 invalidate するため、
+`scripts/proxmox-zabbix-*.sh` は ZBX_API_TOKEN を優先 read する設計。
 
 詳細は [docs/homelab-git-workflow.md](docs/homelab-git-workflow.md) §6 を参照。
 
