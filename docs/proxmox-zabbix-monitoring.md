@@ -286,7 +286,7 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 - [ ] ntfy zabbix user token のローテーション + media type 更新
 - [ ] バックアップを外部ストレージに同期するスクリプト (rsync, restic, rclone 等)
 - [ ] PVE firewall 再有効化検討（現状 enable: 0）
-- [ ] Phase 4-B: Nextcloud 監視（未対応）
+- [x] ~~Phase 4-B: Nextcloud 監視~~ → 2026-05-15 完了 (§8.2 参照)
 - [ ] dns2 の DoT/DoH 再有効化検討（Technitium 15.x の挙動次第）
 
 ### 参考リンク
@@ -297,6 +297,37 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 - step-ca: <https://smallstep.com/docs/step-ca/>
 
 ## 8. 運用知見メモ（継続追加）
+
+### 2026-05-15: Phase 4-B Nextcloud 監視 (Issue #1)
+
+#### 経緯と詰まりポイント
+- Nextcloud 側で監視用 app password 発行を試みたが、admin パスワードが不明 → **専用ユーザ `zabbix-monitor` を `occ user:add --group=admin` で新設** (鍵分離の原則、Issue #2 で扱った rotation 容易性のため)
+- ログイン画面が「読み込み中」のまま固まる → 原因は **`/mnt/omv/nas/*` を指す壊れた `files_external` mount 3 件** が apache worker を詰まらせていた。`occ files_external:list` で発見、`files_external:delete` で除去後 restart で復旧 (load avg 9.44 → 1.90)
+- Zabbix 7.0 LTS には Nextcloud HTTP テンプレが**初期インポートされていない** → `git.zabbix.com` の release/7.0 archive を tar.gz で取得 (`/rest/api/1.0/.../archive?at=refs%2Fheads%2Frelease%2F7.0&format=tar.gz`)、`templates/app/nextcloud/template_app_nextcloud_http.yaml` を抽出 → Zabbix API `configuration.import` で投入
+- 初実装の apply スクリプトは macro 名を upstream と取り違えて（`URL/USER/PASSWORD/SSL_VERIFY_*` と推測） → 実際は `ADDRESS/SCHEMA/USER.NAME/USER.PASSWORD`。スクリプト修正後に再実行
+- `jq -Rs .` を heredoc 入力に使うと末尾改行が string 値に混入し `Invalid parameter "/1/macro": incorrect syntax near "\n"` で API が拒否 → `jq -nc --arg key val '...'` 形式に書き換えて解消
+
+#### 反映内容
+- Zabbix host `nextcloud` (hostid=10687) に template `Nextcloud by HTTP` (templateid=10602) を `host.massadd` で追加 link (既存 Linux テンプレ温存)
+- Host macros 4 件 upsert:
+  - `{$NEXTCLOUD.ADDRESS}` = `nextcloud.home.yagamin.net`
+  - `{$NEXTCLOUD.SCHEMA}` = `https`
+  - `{$NEXTCLOUD.USER.NAME}` = `zabbix-monitor`
+  - `{$NEXTCLOUD.USER.PASSWORD}` = (Secret text)
+
+#### 動作確認 (実証)
+- nextcloud.* item 全件 state=0 (正常)。例: active_users.last1h=2, apps.installed=49, db.version=11.8.6 (MariaDB), freespace=25.8GB
+- LLD: `nextcloud.user.discovery` rule active、計 59 discovered items (Linux テンプレ由来含む)
+- Triggers 実発火 3 件 → 既存 action "All triggers to Admin" 経由で **ntfy / Discord / Mailgun 3 系統に正常配信** (initial build 以来の実 trigger による初の通知系 end-to-end 検証):
+  - Nextcloud: Application updates are available (Warning)
+  - Nextcloud: Server not up to date (Information)
+  - Nextcloud: User "admin": inactive over 30 days (Information)
+
+#### 残る関連タスク (別 Issue 化候補)
+- `zabbix-monitor` の app password はチャットに平文露出したのでローテ必須 (運用引き継ぎ後に実施)
+- `files_external` で削除した 3 mount は backup `/root/nc-files_external-backup-20260515.json` 保管。NAS 再構築時の参考用
+- NC33 系で `-dev.0` 末尾の app バージョンが多数 → nightly/RC channel? 安定版運用への切替検討
+- Zabbix server が `nextcloud.home.yagamin.net` への HTTPS 接続に成功している = 何らかの形で step-ca CA を信頼しているか、HTTP agent 側の SSL_VERIFY が無効。詳細は未確認 (調査タスク化候補)
 
 ### 2026-05-15: 地理マップ (Geomap) widget の調査
 
