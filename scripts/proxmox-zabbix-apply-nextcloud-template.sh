@@ -31,7 +31,7 @@
 
 set -euo pipefail
 
-ZBX_URL="http://192.168.11.55/api_jsonrpc.php"
+ZBX_URL="${ZBX_URL:-https://zabbix.home.yagamin.net/api_jsonrpc.php}"
 NC_HOST_NAME="nextcloud"            # Zabbix 側のホスト名
 NC_SCHEMA="https"
 NC_ADDRESS="nextcloud.home.yagamin.net"
