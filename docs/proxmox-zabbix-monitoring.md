@@ -405,6 +405,14 @@ CF Tunnel   ──HTTP 80──► 127.0.0.1:80      (loopback only)  ──► 
 #### 残課題
 - `/etc/nginx/conf.d/zabbix.conf.symlink.bak` は退避ファイル、package 更新時の rollback 起点として保持
 
+#### クライアント側の追加対応 (任意、未実施)
+- step-ca の Root CA は Windows / macOS の信頼ストアに**入っていない**ため、ブラウザは「保護されていない接続」と表示する (実際は TLS だが chain 検証不可)
+- Edge の InPrivate モードは特にこれを「HTTPS 非サポート」扱いに見せる
+- 解決: `/etc/nginx/ssl/ca.crt` (= step-ca Root CA) を `home-yagamin-ca.crt` 等として書き出し → Windows の `信頼されたルート証明機関` にインポート
+- 同じ Root CA で署名された Nextcloud 等の他サービスも同時に警告なしになる
+- 外部 (`https://zabbix.yagamin.net` 経由 CF Tunnel) は CF 発行証明書なので影響なし、インポート不要
+- 現状: 検証環境なので未実施、本格運用したくなったタイミングでクライアント PC ごとに導入
+
 ### 2026-05-15: 地理マップ (Geomap) widget の調査
 
 - **用途**: ホスト Inventory に latitude/longitude を設定すると、リアルマップ上にホストをプロット
