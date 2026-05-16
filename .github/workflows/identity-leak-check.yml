@@ -1,0 +1,62 @@
+name: Identity Leak Check
+
+# 個人識別情報 (実 Linux ユーザー名 / 個人メール) がリポジトリの blob または
+# commit message に混入していないか、push/PR ごとに検知する。
+#
+# pre-commit / commit-msg hook が一次防衛、本 workflow は CI 側の最終ゲート。
+# Copilot / GitHub UI 経由のコミット等、ローカル hook を経由しない経路を救う。
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan tracked files (blob content)
+        id: scan-blobs
+        run: |
+          set +e
+          # 除外: 本ポリシーを定義しているファイル自身 (regex literal を含むため)
+          MATCHES=$(grep -rInE '(t-ando|takao\.andoh)' --exclude-dir=.git . \
+            | grep -vE '^\./(\.github/workflows/identity-leak-check\.yml|scripts/git-hooks/(pre-commit|commit-msg)):')
+          if [[ -n "$MATCHES" ]]; then
+            echo "::error::Identity leak detected in tracked files"
+            echo "$MATCHES" | head -30
+            echo "" >&2
+            echo "対処: t-ando → shotayagami, takao.andoh@... → <your-email> に置換" >&2
+            exit 1
+          fi
+          echo "OK: no identity leak in tracked files"
+
+      - name: Scan commit messages of this push / PR
+        run: |
+          set +e
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          elif [[ -n "${{ github.event.before }}" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            RANGE="${{ github.event.before }}..${{ github.sha }}"
+          else
+            # 初回 push / 単一 commit fallback: HEAD のみ
+            RANGE="HEAD~1..HEAD"
+          fi
+          echo "Scanning commit messages in range: $RANGE"
+          MATCHES=$(git log --format='%H%n%B%n---END---' "$RANGE" 2>/dev/null | grep -InE '(t-ando|takao\.andoh)')
+          if [[ -n "$MATCHES" ]]; then
+            echo "::error::Identity leak detected in commit message(s)"
+            echo "$MATCHES" | head -30
+            exit 1
+          fi
+          echo "OK: no identity leak in commit messages"
