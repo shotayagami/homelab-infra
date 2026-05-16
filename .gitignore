@@ -40,3 +40,7 @@ zabbix-configs/*
 !zabbix-configs/sanitized/
 
 .claude/
+
+# Node.js (secretlint 用の devDependencies)
+node_modules/
+npm-debug.log*

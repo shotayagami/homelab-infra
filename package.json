@@ -1,0 +1,15 @@
+{
+  "name": "homelab-infra",
+  "version": "1.0.0",
+  "description": "ホームラボ Proxmox VE 環境の構成管理リポジトリ。Zabbix 監視基盤 + 通知 (ntfy / Discord / Email) を中心に、関連スクリプトとドキュメントを集約する。",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "secretlint": "secretlint --secretlintignore .gitignore '**/*'",
+    "secretlint:staged": "secretlint --secretlintignore .gitignore"
+  },
+  "devDependencies": {
+    "@secretlint/secretlint-rule-preset-recommend": "^12.0.0",
+    "secretlint": "^12.0.0"
+  }
+}

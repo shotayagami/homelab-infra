@@ -12,7 +12,8 @@
 #   しないようにするための措置。Public 化後の filter-repo を 3 回踏んだ
 #   経緯から、検知対象自身がリーク源にならないようにする。
 # Check 2: gitleaks v8 (汎用機微情報スキャン)
-# Check 3: 簡易 regex (gitleaks 未インストール時の fallback)
+# Check 3: secretlint (補完。gitleaks と別ルールセットで二重化)
+# Check 4: 簡易 regex (gitleaks 未インストール時の fallback)
 set -e
 
 # ─────────────────────────────────────────────────────────────
@@ -81,6 +82,35 @@ else
     echo "  バイパス: git commit --no-verify" >&2
     exit 1
   fi
+fi
+
+# ─────────────────────────────────────────────────────────────
+# Check 3: secretlint (gitleaks と異なるルールセットで二重化)
+# ─────────────────────────────────────────────────────────────
+# Node.js 製。`npm install` 済みなら node_modules/.bin に展開される。
+# 未インストール時は skip (Check 1/2 で最低限の網は張れている)。
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SECRETLINT_BIN="$REPO_ROOT/node_modules/.bin/secretlint"
+if [[ -x "$SECRETLINT_BIN" ]]; then
+  # staged ファイルのみを対象。削除/リネーム元は対象外、binary 等は secretlint が無視。
+  # ファイル名に NUL や改行が含まれる前提はインフラリポジトリでは不要 (簡素化を優先)。
+  mapfile -t STAGED_FOR_LINT < <(
+    git diff --cached --name-only --diff-filter=ACMR | while IFS= read -r f; do
+      [[ -f "$f" ]] && printf '%s\n' "$f"
+    done
+  )
+  if (( ${#STAGED_FOR_LINT[@]} > 0 )); then
+    if ! "$SECRETLINT_BIN" --secretlintignore "$REPO_ROOT/.gitignore" \
+        "${STAGED_FOR_LINT[@]}"; then
+      echo "" >&2
+      echo "ERROR: secretlint が機微情報の混入を検出しました。" >&2
+      echo "  対処: 該当箇所を除去するか .secretlintrc.json で allowlist 化。" >&2
+      echo "  バイパス (非推奨): git commit --no-verify" >&2
+      exit 1
+    fi
+  fi
+else
+  echo "INFO: secretlint 未導入のためスキップ (npm install で有効化)。" >&2
 fi
 
 exit 0
