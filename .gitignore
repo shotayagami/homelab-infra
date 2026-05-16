@@ -27,6 +27,10 @@
 *.bak
 *.bak.*
 
+# GitHub Actions / workflow は個人識別 regex 等が平文混入しやすいため
+# このリポジトリでは追跡しない。CI は外部ジョブで運用する。
+.github/
+
 # Zabbix configuration export は機微情報（SMTP password, webhook URL 等）を含むため
 # Git 管理しない。raw export は別途オフラインで保管。
 # サニタイズ済みのスナップショットを残したい場合は zabbix-configs/sanitized/ に置く。
@@ -34,3 +38,5 @@ zabbix-configs/*
 !zabbix-configs/.gitkeep
 !zabbix-configs/README.md
 !zabbix-configs/sanitized/
+
+.claude/
