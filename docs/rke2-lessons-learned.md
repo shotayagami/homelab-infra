@@ -356,9 +356,47 @@ metadata:
 
 ---
 
-## 13. npm / フロントエンド
+## 13. Trivy Operator
 
-### 13-1. `npm ci` には `package-lock.json` が必要
+### 13-1. `scanJobsConcurrentLimit` は worker の vCPU 数より小さく
+
+`operator.scanJobsConcurrentLimit` (env `OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT`、chart デフォルト `10`) は **同時走行するスキャン Job 数の上限**。各 Job は `trivy.resources.limits.cpu: 1000m` で、`trivy.mode: Standalone`(chart デフォルト)では初回 DB ダウンロード + イメージスキャン中に実際に 1 CPU を使い切る。
+
+3 vCPU の `k8s-worker1` 上で `scanJobsConcurrentLimit: 4` のまま運用したところ、トリガ条件(例: 多数の workload を同時 enroll、イメージタグ多数更新)で load average が 13 を超え、Zabbix `Linux: Load average is too high (per CPU load over 1.5 for 5m)` が発火 (2026-05-17 観測)。
+
+**対処:** worker の vCPU 数より小さい値にする。3 vCPU なら `2`。
+
+即時(deployment env 直接更新、`helm upgrade` まで保持):
+```bash
+kubectl -n trivy-system set env deploy/trivy-operator \
+  OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT=2 OPERATOR_SCAN_JOB_RETRY_AFTER=60s
+```
+
+恒久(`helm upgrade` 用 values.yaml):
+```yaml
+operator:
+  scanJobsConcurrentLimit: 2
+  scanJobRetryAfter: 60s
+trivy:
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1536Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+```
+
+**根本的改善 (未実施 / 次の打ち手):**
+- worker ノードの vCPU 増設(`k8s-worker1` 3 → 4 以上)
+- `trivy.mode: ClientServer` 化で中央 Trivy server による DB 共有(各 Job の重複 DL 排除)
+- スキャン Job 用 `tolerations` を入れ、cp1 にも分散
+
+---
+
+## 14. npm / フロントエンド
+
+### 14-1. `npm ci` には `package-lock.json` が必要
 
 新規プロジェクトでいきなり `npm ci` するとコケる。
 
@@ -366,7 +404,7 @@ metadata:
 
 ---
 
-## 14. ExternalName Service (K8s 外 DB へのルーティング)
+## 15. ExternalName Service (K8s 外 DB へのルーティング)
 
 K8s クラスタ外の DB (LXC PostgreSQL 等) への接続は、ExternalName Service で透過化できる:
 
@@ -387,7 +425,7 @@ spec:
 
 ---
 
-## 15. 関連ドキュメント
+## 16. 関連ドキュメント
 
 - [docs/rke2-cluster.md](rke2-cluster.md) — クラスタ全体構成、Phase 0/1/2 最適化、etcd 再配置
 - [docs/pg-db-postgresql.md](pg-db-postgresql.md) — pg-db (LXC 106) と RKE2 アプリの接続
