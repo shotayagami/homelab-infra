@@ -199,13 +199,17 @@ silence ID は `amtool ... silence query` で確認できる。
 2. **Helm values で `defaultRules.disabled.KubeCPUOvercommit: true` に切り替えた場合** — silence は不要になる
 3. **2027-05-16 にサイレンス期限切れ** — 再評価して再延長か恒久対応か判断
 
-### このアラートは「リソース削減」では消せない (2026-05-16 検討記録)
+### このアラートは「リソース削減」では実用上消せない (2026-05-16 検討記録)
 
-過去に検討した思考の罠を残しておく。以下はすべて **試したが解決にならなかった、または初手から論理的に意味がない** ものなので、再発防止のため明示する。
+検討中に通った誤った経路と、その先の実現可能性評価を残しておく。将来同じ検討を繰り返さないための記録。
 
-**❌ host メモリの解放は KubeCPUOvercommit に効かない**: ルールは pod の `requests.cpu` と node の `allocatable.cpu` だけを参照する。`KubeCPUOvercommit` の文脈で VM の memory trim (OMV 2048→1536 MB 等) を議論しても、CPU 軸には 1 mCPU も影響しない。一度この罠にハマったので注意。
+**❌ host メモリの解放は KubeCPUOvercommit に直接影響しない**
 
-**❌ pod の CPU requests を下げて 3000m 未満を狙うのも不可**: RKE2 制御プレーン + Longhorn の "触れない床" だけで以下の通り 3000m に達してしまう。
+ルールは pod の `requests.cpu` と node の `allocatable.cpu` のみを参照する。本アラートの解消を目的に VM の memory trim (OMV 2048→1536 MB 等) を実施しても、CPU 軸には 1 mCPU も影響しない。検討の途中で一度この誤った前提に立ったため、明示的に注意点として残す。
+
+**△ pod の CPU requests を下げて 3000m 未満を狙うのは数学的には可能だが、実用上は不可**
+
+RKE2 制御プレーン + Longhorn など、削減できないか削減するとサービス影響が大きい下限要素を集計すると以下のようになる:
 
 | Pod / コンポーネント | requests.cpu | 削減可否 |
 |---|---|---|
@@ -218,11 +222,21 @@ silence ID は `amtool ... silence query` で確認できる。
 | Longhorn instance-manager × 2 | 480m + 360m | 不可 (ストレージ I/O 性能担保) |
 | rke2-ingress-nginx × 2 | 200m | 削減検討余地あるが影響大 |
 | rke2-coredns × 2 | 200m | 同上 |
-| **床 (削れない / 削るとサービス影響大)** | **~2590m** | — |
+| **下限合計 (削れない / 削るとサービス影響大)** | **~2590m** | — |
 
-→ 仮に上記の床以外 (cloudflared / kyverno / その他 application pod 合計 ~2100m) を**全部ゼロに削っても床 2590m 残るため**、`sum(requests) - 3000 > 0` の構図は基本的に逃れられない。なお application 系を本格削減した場合は機能的に多くが死ぬ。
+下限 2590m に対して閾値は 3000m なので、**残り 410m が application pod に許容される予算**となる。
 
-**結論**: このクラスタトポロジ (1 control-plane + 1 worker) では **`KubeCPUOvercommit` は構造的に発火し続けるアラート**であり、サイレンス継続 or Helm values での恒久無効化が唯一現実的な対応。
+| | mCPU |
+|---|---|
+| 削れない下限 | 2590m |
+| 閾値 | 3000m |
+| application pod に許される枠 | **410m** |
+| 現在の application pod 合計 (cloudflared / kyverno / gitea / DB 系 / argocd / velero など) | **~2100m** |
+| 削減が必要な量 | **~1690m** |
+
+つまり application pod 群を現状 2100m から **410m 以下** まで圧縮すれば数学的にはアラート消失。が、kyverno (4 コントローラ × 100m = 400m) だけで予算をほぼ使い切るうえ、cloudflared / argocd / gitea / 各種 DB / monitoring を 0 近傍まで絞れば多くのサービスがスロットリングで実害を出す。
+
+**結論**: 1 control-plane + 1 worker トポロジでは **`KubeCPUOvercommit` は実用上発火し続けるアラート** (数学的には消せるが、消すとサービスを壊す)。サイレンス継続、または Helm values での恒久無効化が現実解。
 
 ### 恒久対応の選択肢 (実施は保留)
 
@@ -246,7 +260,7 @@ defaultRules:
 | Storage (local-lvm) | 658 GiB free | 余裕 |
 | Network | 1 GbE 1 本 | Longhorn replica 同期で帯域逼迫の懸念 |
 
-→ **メモリが瓶頸**。先に [docs/hardware.md](hardware.md) §「将来の拡張余地」記載の **64 GB DIMM 換装** をやらないと worker2 は危険。
+→ **メモリがボトルネック**。先に [docs/hardware.md](hardware.md) §「将来の拡張余地」記載の **64 GB DIMM 換装** をやらないと worker2 は危険。
 
 > ⚠ **2026 年 DRAM 価格高騰**: AI 向け HBM への製造シフトで DDR4 が逼迫。2025Q4→2026Q1 で DRAM 価格 80-90% QoQ、DDR4 32 GB kit が ~2-3 倍に。Silicon Power 等の 16 GB DIMM 単体で 2026 年 5 月時点 ~18,000 円台 (セール時)。**16 GB × 4 = 64 GB 換装は実勢 4〜7 万円**を見ておくのが現実的 (hardware.md の「1 万円台」は執筆当時の旧相場で、現状では大幅に乖離)。供給回復は 2027 後半以降との見方が多い。
 
