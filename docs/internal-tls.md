@@ -30,6 +30,8 @@ Nextcloud (LXC 108、192.168.11.62) で nginx の TLS 終端を行うため、st
 
 ### systemd unit (`step-renew-nextcloud.service`)
 
+**リポジトリ内コピー**: [scripts/systemd-units/step-renew-nextcloud.service](../scripts/systemd-units/step-renew-nextcloud.service) (Zabbix 用も同型: [scripts/systemd-units/step-renew-zabbix.service](../scripts/systemd-units/step-renew-zabbix.service))
+
 ```ini
 [Unit]
 Description=Renew Nextcloud TLS cert from step-ca

@@ -100,8 +100,8 @@ PG ログ（2026-05-16）から確認できた接続元:
 
 | 項目 | 値 |
 |---|---|
-| スクリプト | `/usr/local/bin/pg_backup.sh` |
-| Cron | `/etc/cron.d/pg_backup` — `0 2 * * * root /usr/local/bin/pg_backup.sh` |
+| スクリプト | `/usr/local/bin/pg_backup.sh` (リポジトリ内コピー: [scripts/lxc-pg-db/pg_backup.sh](../scripts/lxc-pg-db/pg_backup.sh)) |
+| Cron | `/etc/cron.d/pg_backup` — `0 2 * * * root /usr/local/bin/pg_backup.sh` (リポジトリ内: [scripts/lxc-pg-db/pg_backup.cron](../scripts/lxc-pg-db/pg_backup.cron)) |
 | 出力先 | `/var/backups/postgresql/` (postgres:postgres 700) |
 | 形式 | DB ごとに `pg_dump -Fc` (custom format) + `pg_dumpall --globals-only` |
 | ファイル名 | `<db>_YYYY-MM-DD_HHMM.dump`, `globals_YYYY-MM-DD_HHMM.sql` |
@@ -174,7 +174,7 @@ PG は `192.168.11.60:5432` のみで listen し、`127.0.0.1:5432` を持たな
 
 ### LXC 共通の trigger 調整
 
-[memory: proxmox-zabbix](../../.claude/projects/-home-t-ando/memory/proxmox_zabbix_monitoring.md) の運用ルール通り、`Linux: Load average is too high` (triggerid=27732) は LXC では `/proc/loadavg` をホストと共有するため誤発火源 → **disable 済**。
+[docs/proxmox-zabbix-monitoring.md](proxmox-zabbix-monitoring.md) §「LXC は `/proc/loadavg` を PVE ホストと共有する」の運用ルール通り、`Linux: Load average is too high` (triggerid=27732) は LXC では `/proc/loadavg` をホストと共有するため誤発火源 → **disable 済**。
 
 ### 動作確認 (構築直後)
 

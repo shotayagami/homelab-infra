@@ -1,0 +1,12 @@
+# VM/LXC 死活監視ターゲット
+# 形式: VMID TYPE IP NAME
+# TYPE: vm または lxc
+#
+# このリポジトリの実環境例 (2026-05-16 時点):
+110 vm 192.168.11.80 k8s-cp1
+120 vm 192.168.11.83 k8s-worker1
+# 121 vm 192.168.11.84 k8s-worker2  # disabled 2026-05-16: VM does not exist on this node
+104 lxc 192.168.11.53 dns
+105 lxc 192.168.11.54 dns2
+106 lxc 192.168.11.60 pg-db
+107 lxc 192.168.11.61 step-ca

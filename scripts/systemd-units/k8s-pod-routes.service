@@ -1,0 +1,13 @@
+[Unit]
+Description=Static routes to K8s pod network (cilium /24 per node)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ip route replace 10.42.0.0/24 via 192.168.11.80
+ExecStart=/sbin/ip route replace 10.42.1.0/24 via 192.168.11.83
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

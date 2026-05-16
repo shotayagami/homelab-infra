@@ -44,24 +44,44 @@
 ├── docs/                         ← 運用ドキュメント
 │   ├── hardware.md                    ← ハードウェア詳細 + storage tier 設計
 │   ├── proxmox-firewall.md            ← PVE Firewall 運用・ロックアウト復旧
+│   ├── proxmox-host-self-healing.md   ← network-watchdog / vm-health-monitor 自律復旧層
 │   ├── admin-vm-tooling.md            ← admin-vm の pct/qm/pvesh ラッパー
 │   ├── internal-dns.md                ← Technitium dns/dns2 (Primary/Secondary + DHCP)
 │   ├── internal-tls.md                ← step-ca + サービス TLS 自動更新
 │   ├── puter-selfhost.md              ← Puter (LXC 102) セルフホスト
 │   ├── pg-db-postgresql.md            ← pg-db (LXC 106) アプリ用 PostgreSQL 17
 │   ├── rke2-cluster.md                ← RKE2 クラスタの workload と最適化履歴
+│   ├── rke2-workloads.md              ← RKE2 上のアプリカタログ (ICS / WordPress / Gitea / Harbor)
+│   ├── rke2-lessons-learned.md        ← K8s / cert-manager / Bitnami のハマりポイント集
+│   ├── backup-strategy.md             ← 多層バックアップの俯瞰 (vzdump / CronJob / Longhorn / Velero / etcd)
 │   ├── proxmox-zabbix-monitoring.md   ← Zabbix Phase 1-6 構築記録 + 運用知見
 │   ├── homelab-git-workflow.md        ← Git 運用ルール
 │   ├── github-post-setup.md           ← GitHub 設定の継続作業
 │   └── remaining-tasks.md             ← 残タスク一覧
-├── scripts/                      ← デプロイ・運用スクリプト
+├── scripts/                      ← デプロイ・運用スクリプト + 救出済の runtime 系
 │   ├── git-hooks/                     ← Git hooks の正本（install-hooks.sh で symlink）
 │   │   └── pre-commit
 │   ├── install-hooks.sh
 │   ├── github-create-initial-issues.sh
 │   ├── proxmox-deploy-puter-cloudflare-access.sh
+│   ├── proxmox-deploy-zabbix-cloudflare-access.sh
 │   ├── proxmox-setup-extra-storage-sda-sdb.sh
-│   └── proxmox-zabbix-set-host-location.sh
+│   ├── proxmox-zabbix-apply-nextcloud-template.sh
+│   ├── proxmox-zabbix-set-host-location.sh
+│   ├── admin-vm/                      ← admin-vm 配置物
+│   │   └── pve-wrapper                   ← pct/qm/pvesh/pveum SSH ラッパー
+│   ├── pve-host/                      ← PVE host 配置物
+│   │   ├── network-watchdog.{sh,service}     ← NIC 障害検知・段階エスカレーション
+│   │   ├── vm-health-monitor.{sh,service}    ← VM/LXC 死活監視・自動復旧
+│   │   ├── vm-health-monitor.targets.conf.example
+│   │   └── jobs.cfg.example                  ← vzdump スケジュールサンプル
+│   ├── lxc-pg-db/                     ← LXC 106 (pg-db) 配置物
+│   │   ├── pg_backup.sh                      ← PG 日次 dump スクリプト
+│   │   └── pg_backup.cron                    ← 同 cron 登録
+│   └── systemd-units/                 ← step-ca + Cilium 経路 unit 群
+│       ├── step-renew-nextcloud.service
+│       ├── step-renew-zabbix.service
+│       └── k8s-pod-routes.service
 └── zabbix-configs/               ← Zabbix 設定スナップショット
     ├── .gitkeep
     └── README.md                       ← 配置ルール
@@ -72,6 +92,9 @@
 ### システム基盤
 - **ハードウェア構成**: [docs/hardware.md](docs/hardware.md)
 - **PVE Firewall 運用**: [docs/proxmox-firewall.md](docs/proxmox-firewall.md)
+- **PVE ホスト自律復旧**: [docs/proxmox-host-self-healing.md](docs/proxmox-host-self-healing.md)
+- **バックアップ多層構造**: [docs/backup-strategy.md](docs/backup-strategy.md)
+- **K8s / RKE2 Lessons Learned**: [docs/rke2-lessons-learned.md](docs/rke2-lessons-learned.md)
 - **admin-vm 運用ツール**: [docs/admin-vm-tooling.md](docs/admin-vm-tooling.md)
 
 ### サービス
@@ -79,7 +102,8 @@
 - **内部 TLS / PKI (step-ca)**: [docs/internal-tls.md](docs/internal-tls.md)
 - **Puter セルフホスト**: [docs/puter-selfhost.md](docs/puter-selfhost.md)
 - **pg-db (アプリ用 PostgreSQL)**: [docs/pg-db-postgresql.md](docs/pg-db-postgresql.md)
-- **RKE2 クラスタ**: [docs/rke2-cluster.md](docs/rke2-cluster.md)
+- **RKE2 クラスタ (インフラ層)**: [docs/rke2-cluster.md](docs/rke2-cluster.md)
+- **RKE2 ワークロード (アプリ層)**: [docs/rke2-workloads.md](docs/rke2-workloads.md)
 - **Zabbix 監視 (Phase 1-6 構築記録)**: [docs/proxmox-zabbix-monitoring.md](docs/proxmox-zabbix-monitoring.md)
 
 ### 運用・リポジトリ

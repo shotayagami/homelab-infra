@@ -74,7 +74,7 @@ set -o history
 
 ## 📚 PVE 旧 Claude rescue 由来 (2026-05-16)
 
-PVE host (192.168.11.11) の `/root/.claude/` を `/home/t-ando/.claude-pve-rescue/claude-pve-root-2026-05-16.tar.gz` (3.5MB / 370 ファイル) に退避完了。本人 admin-vm 移行で孤立していた root 時代の作業履歴・memory・会話履歴 (76 セッション、2026-02-07〜03-30 期間) を回収。
+PVE host (192.168.11.11) の `/root/.claude/` を `/home/shotayagami/.claude-pve-rescue/claude-pve-root-2026-05-16.tar.gz` (3.5MB / 370 ファイル) に退避完了。本人 admin-vm 移行で孤立していた root 時代の作業履歴・memory・会話履歴 (76 セッション、2026-02-07〜03-30 期間) を回収。
 
 新 memory への構造化済 (homelab-infra 外、ローカル運用者の Claude memory `~/.claude/projects/<project-cwd>/memory/`):
 
@@ -98,7 +98,7 @@ PVE host (192.168.11.11) の `/root/.claude/` を `/home/t-ando/.claude-pve-resc
 
 ### 作業ルール
 
-- 退避 tarball は **絶対 git にコミットしない**。`/home/t-ando/.claude-pve-rescue/` 配下に mode 600 (推奨: ディレクトリも 700) で保管し、必要に応じてさらに暗号化ストレージへ
+- 退避 tarball は **絶対 git にコミットしない**。`/home/shotayagami/.claude-pve-rescue/` 配下に mode 600 (推奨: ディレクトリも 700) で保管し、必要に応じてさらに暗号化ストレージへ
 - PVE host の `/root/.claude` 自体は当面残す (read-only で再アクセス可能、将来 host 作り直し時に自然消滅)
 
 ---
