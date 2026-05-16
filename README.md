@@ -2,6 +2,22 @@
 
 ホームラボ Proxmox VE 環境の構成管理リポジトリ。Zabbix 監視基盤 + 通知 (ntfy / Discord / Email) を中心に、関連スクリプトとドキュメントを集約する。
 
+## ハードウェア構成
+
+| 項目 | 内容 |
+|---|---|
+| 筐体 | HP EliteDesk 800 G4 SFF |
+| CPU | Intel Core i5-8500 (Coffee Lake, 6C/6T, 3.0–4.1 GHz) |
+| メモリ | 32 GiB DDR4-2400 (4×8 GB、4 スロット全埋め、最大 64 GB) |
+| 主ストレージ | Samsung 970 EVO Plus 1 TB NVMe — `local-lvm` (LVM-thin 794 GB) + `local` |
+| 追加 SSD A | SPCC 480 GB SATA TLC — `store-sda` (RKE2 worker1 / Longhorn replica) |
+| 追加 SSD B | Fanxiang S101Q 1 TB SATA QLC — `store-sdb` (バックアップ専用) |
+| USB HDD | WDC 8/4 TB + Seagate 3/2 TB (コールドストレージ、未マウント) |
+| NIC | Intel I219-LM オンボード 1 GbE → `vmbr0` 192.168.11.11/24 |
+| Hypervisor | Proxmox VE 9.1.11 / Kernel 6.17.13-8-pve |
+
+詳細・storage tier の決定経緯・拡張余地は [docs/hardware.md](docs/hardware.md) を参照。
+
 ## 主要対象
 
 | 役割 | VMID/CTID | 種別 | IP | 概要 |
@@ -26,6 +42,7 @@
 ├── .gitignore                    ← 機微情報を除外する設定
 ├── .env.example                  ← .env のテンプレート
 ├── docs/                         ← 運用ドキュメント
+│   ├── hardware.md                    ← ハードウェア詳細 + storage tier 設計
 │   ├── proxmox-zabbix-monitoring.md   ← Phase 1-6 構築記録 + 運用知見
 │   ├── homelab-git-workflow.md        ← Git 運用ルール
 │   └── github-post-setup.md           ← GitHub 設定の継続作業
