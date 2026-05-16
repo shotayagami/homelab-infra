@@ -5,20 +5,25 @@
 #
 # 動機:
 #   pre-commit は staged blob 内容のみ検査するため、commit message に書いた
-#   `/home/shotayagami/...` のような文字列はすり抜ける。Public 化後の filter-repo 3 回目で
-#   commit message 由来の漏出を検知したため、message 側もブロックする。
+#   ホームパス等の文字列はすり抜ける。Public 化後の filter-repo 3 回目で
+#   message 由来の漏出を検知したため、message 側もブロックする。
+#
+# 検知対象パターンは source 上に literal で書かないため hex escape で構築する。
+# 詳細は同階層の pre-commit を参照。
 #
 # 引数: $1 = commit message が書かれた一時ファイルのパス
 set -e
 
 MSG_FILE="$1"
-IDENTITY_PATTERN='(shotayagami|takao\.andoh)'
+_P1=$'\x74-\x61ndo'
+_P2=$'\x74akao\\.\x61ndoh'
+IDENTITY_PATTERN="(${_P1}|${_P2})"
 
 if grep -IqE "$IDENTITY_PATTERN" "$MSG_FILE" 2>/dev/null; then
-  echo "ERROR: コミットメッセージに個人識別情報 (shotayagami / private.email) が含まれています:" >&2
+  echo "ERROR: コミットメッセージに個人識別情報が含まれています:" >&2
   grep -InE "$IDENTITY_PATTERN" "$MSG_FILE" 2>/dev/null | head -3 | sed 's|^|  |' >&2
   echo "" >&2
-  echo "  対処: shotayagami → shotayagami、private.email@... → <your-email> に置換してください。" >&2
+  echo "  対処: 個人識別子をマスクしてください (詳細は pre-commit の _P1/_P2 を参照)。" >&2
   echo "  メッセージ編集: 上記エラー後、再 commit すれば編集画面に戻れます。" >&2
   echo "  バイパス (非推奨): git commit --no-verify" >&2
   exit 1
