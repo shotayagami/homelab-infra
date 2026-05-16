@@ -6,10 +6,45 @@
 #   bash scripts/install-hooks.sh
 # を実行して .git/hooks/pre-commit に symlink を張る。
 #
-# Primary: gitleaks v8 (gitleaks git --pre-commit --staged)
-# Fallback: 簡易 regex (gitleaks 未インストール時)
+# Check 1: Identity leak (本リポジトリ固有)
+#   実 Linux ユーザー名 (shotayagami) と個人メール (private.email) の混入を検知。
+#   Public 化後の filter-repo を 3 回踏んでいるため、最優先で防ぐ。
+# Check 2: gitleaks v8 (汎用機微情報スキャン)
+# Check 3: 簡易 regex (gitleaks 未インストール時の fallback)
 set -e
 
+# ─────────────────────────────────────────────────────────────
+# Check 1: Identity leak
+# ─────────────────────────────────────────────────────────────
+# shotayagami → shotayagami、private.email → <your-email> のマスクが必要。
+# 例外: 本ポリシーを定義しているファイル自身 (regex literal を含むため)。
+IDENTITY_PATTERN='(shotayagami|takao\.andoh)'
+POLICY_FILES_RE='^(scripts/git-hooks/(pre-commit|commit-msg)|\.github/workflows/identity-leak-check\.yml)$'
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR || true)
+identity_found=0
+if [[ -n "$STAGED_FILES" ]]; then
+  while IFS= read -r f; do
+    [[ -z "$f" || ! -f "$f" ]] && continue
+    [[ "$f" =~ $POLICY_FILES_RE ]] && continue
+    if grep -IqE "$IDENTITY_PATTERN" "$f" 2>/dev/null; then
+      if [[ $identity_found -eq 0 ]]; then
+        echo "ERROR: 個人識別情報 (shotayagami / private.email) が混入しています:" >&2
+        identity_found=1
+      fi
+      grep -InE "$IDENTITY_PATTERN" "$f" 2>/dev/null | head -3 | sed "s|^|  $f:|" >&2
+    fi
+  done <<<"$STAGED_FILES"
+fi
+if [[ $identity_found -eq 1 ]]; then
+  echo "" >&2
+  echo "  対処: shotayagami → shotayagami、private.email@... → <your-email> に置換してください。" >&2
+  echo "  バイパス (非推奨): git commit --no-verify" >&2
+  exit 1
+fi
+
+# ─────────────────────────────────────────────────────────────
+# Check 2: gitleaks (機微情報全般)
+# ─────────────────────────────────────────────────────────────
 if command -v gitleaks >/dev/null 2>&1; then
   if ! gitleaks git --pre-commit --staged --redact --no-banner 2>&1; then
     echo "" >&2
