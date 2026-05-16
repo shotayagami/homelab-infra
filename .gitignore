@@ -28,8 +28,10 @@
 *.bak.*
 
 # GitHub Actions / workflow は個人識別 regex 等が平文混入しやすいため
-# このリポジトリでは追跡しない。CI は外部ジョブで運用する。
-.github/
+# このリポジトリでは原則追跡しない。CI は外部ジョブで運用する。
+# 例外: Copilot Code Review 用のレビュー指示 (自然言語のみ、識別子無し)。
+.github/*
+!.github/copilot-instructions.md
 
 # Zabbix configuration export は機微情報（SMTP password, webhook URL 等）を含むため
 # Git 管理しない。raw export は別途オフラインで保管。
