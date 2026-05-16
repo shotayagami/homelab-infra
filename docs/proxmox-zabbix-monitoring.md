@@ -395,7 +395,7 @@ CF Tunnel   ──HTTP 80──► 127.0.0.1:80      (loopback only)  ──► 
 | 証明書 | `step ca certificate` で `zabbix.home.yagamin.net` 用、SAN `192.168.11.55` 込み、寿命 30 日 |
 | 証明書配置 | `/etc/nginx/ssl/zabbix.{crt,key,ca.crt}` (key は 0600) |
 | nginx 設定 | `/etc/nginx/conf.d/zabbix.conf` の symlink を `.symlink.bak` に退避し、3 server block の実体ファイルへ:<br>1. `listen 127.0.0.1:80` (CF Tunnel 専用、平文 OK)<br>2. `listen 192.168.11.55:80` → 301 to `https://zabbix.home.yagamin.net`<br>3. `listen 443 ssl http2` (step-ca cert) |
-| 自動更新 daemon | `step-renew-zabbix.service` (systemd) で 5 日前 (`--expires-in 120h`) renewal + nginx reload。`ProtectHome=read-only` 必須 ([[proxmox-step-ca-nextcloud]] と同じ罠) |
+| 自動更新 daemon | `step-renew-zabbix.service` (systemd) で 5 日前 (`--expires-in 120h`) renewal + nginx reload。`ProtectHome=read-only` 必須 ([[proxmox-step-ca-nextcloud]] と同じ罠)。リポジトリ内コピー: [scripts/systemd-units/step-renew-zabbix.service](../scripts/systemd-units/step-renew-zabbix.service) |
 
 #### 詰まりポイント
 - **nginx 1.24.0 (LXC 190 同梱) は `http2 on;` 未対応** → 旧 syntax `listen 443 ssl http2;` で記述
@@ -474,7 +474,7 @@ CF Tunnel   ──HTTP 80──► 127.0.0.1:80      (loopback only)  ──► 
   10.42.0.0/24 via 192.168.11.80  (cp1)
   10.42.1.0/24 via 192.168.11.83  (worker1)
   ```
-- 永続化: systemd oneshot `/etc/systemd/system/k8s-pod-routes.service` (After=network-online.target、`ip route replace ...` を ExecStart)
+- 永続化: systemd oneshot `/etc/systemd/system/k8s-pod-routes.service` (After=network-online.target、`ip route replace ...` を ExecStart)。リポジトリ内コピー: [scripts/systemd-units/k8s-pod-routes.service](../scripts/systemd-units/k8s-pod-routes.service)
 - RKE2 default Cilium は外部からの forward traffic を許可していたので route だけで開通。BGP / native routing 不要
 
 #### Global timeout 調整

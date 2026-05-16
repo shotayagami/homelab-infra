@@ -1,0 +1,19 @@
+[Unit]
+Description=step-ca certificate renewer for nextcloud
+Documentation=https://smallstep.com/docs/step-cli/reference/ca/renew/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=STEPPATH=/root/.step
+ExecStart=/usr/bin/step ca renew --daemon --expires-in 120h --exec "systemctl reload nginx" /etc/nginx/ssl/nextcloud.crt /etc/nginx/ssl/nextcloud.key
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

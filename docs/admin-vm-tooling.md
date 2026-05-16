@@ -12,7 +12,7 @@ admin-vm 自体は cloud-init で `ubuntu` ユーザー、PVE ホストの root 
 
 ## 2. ラッパースクリプトの実体
 
-`/usr/local/bin/pve-wrapper` (bash 一枚):
+`/usr/local/bin/pve-wrapper` (bash 一枚)。**リポジトリ内のコピー**: [scripts/admin-vm/pve-wrapper](../scripts/admin-vm/pve-wrapper)
 
 - 引数を `printf %q` で安全に再クォートして SSH に渡す
 - 接続先は環境変数 `PVE_HOST` で上書き可能、default `root@192.168.11.11`

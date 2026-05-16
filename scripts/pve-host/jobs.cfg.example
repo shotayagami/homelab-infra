@@ -1,0 +1,16 @@
+# /etc/pve/jobs.cfg
+# Proxmox VE のバックアップ・スケジュールジョブ定義。
+# UUID は新規ジョブ作成時に Proxmox が自動採番する (uuidgen で生成)。
+#
+# このリポジトリの実環境例 (2026-05-16 時点):
+
+vzdump: <vzdump-job-uuid>
+	comment Daily backup of critical infra CTs
+	schedule 02:00
+	compress zstd
+	enabled 1
+	mode snapshot
+	notification-mode notification-system
+	prune-backups keep-daily=7,keep-monthly=6,keep-weekly=4
+	storage store-sdb
+	vmid 104,105,106,107,108,190,191

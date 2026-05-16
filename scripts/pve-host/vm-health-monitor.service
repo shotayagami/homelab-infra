@@ -1,0 +1,15 @@
+[Unit]
+Description=VM/LXC Health Monitor - 死活監視・自動復旧
+After=network-online.target pve-guests.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vm-health-monitor.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
