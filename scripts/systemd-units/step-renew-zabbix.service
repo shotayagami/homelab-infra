@@ -1,0 +1,19 @@
+[Unit]
+Description=step-ca certificate renewal daemon for Zabbix nginx
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/bin/step ca renew --daemon --expires-in 120h --exec "systemctl reload nginx" /etc/nginx/ssl/zabbix.crt /etc/nginx/ssl/zabbix.key
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
