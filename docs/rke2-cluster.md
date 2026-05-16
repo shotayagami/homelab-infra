@@ -210,11 +210,21 @@ silence ID は `amtool ... silence query` で確認できる。
 | Storage (local-lvm) | 658 GiB free | 余裕 |
 | Network | 1 GbE 1 本 | Longhorn replica 同期で帯域逼迫の懸念 |
 
-→ **メモリが瓶頸**。先に [docs/hardware.md](hardware.md) §「将来の拡張余地」記載の **64 GB DIMM 換装** をやらないと worker2 は危険。手順:
+→ **メモリが瓶頸**。先に [docs/hardware.md](hardware.md) §「将来の拡張余地」記載の **64 GB DIMM 換装** をやらないと worker2 は危険。
 
-1. 16 GB DDR4-2666 (non-ECC) DIMM × 4 を調達 (~1 万円台)
+> ⚠ **2026 年 DRAM 価格高騰**: AI 向け HBM への製造シフトで DDR4 が逼迫。2025Q4→2026Q1 で DRAM 価格 80-90% QoQ、DDR4 32 GB kit が ~2-3 倍に。Silicon Power 等の 16 GB DIMM 単体で 2026 年 5 月時点 ~18,000 円台 (セール時)。**16 GB × 4 = 64 GB 換装は実勢 4〜7 万円**を見ておくのが現実的 (hardware.md の「1 万円台」は執筆当時の旧相場で、現状では大幅に乖離)。供給回復は 2027 後半以降との見方が多い。
+
+手順 (調達できた前提):
+
+1. 16 GB DDR4-2666 (non-ECC) DIMM × 4 を調達
 2. PVE をシャットダウンして全 DIMM 入れ替え (DIMM1〜4 全埋め)
 3. ブート確認後、worker2 用 VMID 130 を作成 (cp1 のクローンから RKE2 worker として再 join)
+
+代替案 (メモリ換装が間に合わないとき):
+
+- **既存 VM/LXC の memory を絞って worker2 用に 4-6 GiB 確保**。候補は Puter (CT 102, 8 GiB 割当) や cp1 (9 GiB)、nextcloud (CT 108, 4 GiB)。実 used を確認した上で trim
+- **scale 0 の workload (`ics` / `wordpress` / `app`) を本格削除**して Longhorn replica 含むメモリフットプリントを下げる
+- **そもそも worker2 を諦め、本サイレンスを恒久措置として `defaultRules.disabled.KubeCPUOvercommit: true` を kube-prometheus-stack values に書く**
 
 ## 8. 「クラスタが再び重くなった」場合の最初の確認
 

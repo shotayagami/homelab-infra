@@ -88,7 +88,8 @@ i5-8500 は HT 非搭載のため物理 6 コア = 論理 6 スレッド。RKE2 
 
 ## 将来の拡張余地
 
-1. **メモリ 64 GB 化**: 16 GB DDR4-2666 ECC 非対応モジュール × 4 で 1 万円台。Longhorn + Harbor 本番運用で必須レベル
+1. **メモリ 64 GB 化**: 16 GB DDR4-2666 ECC 非対応モジュール × 4。Longhorn + Harbor 本番運用で必須レベル。
+   - 価格は変動が大きい。2026 年 5 月時点で AI 向け HBM への DRAM 製造シフトにより DDR4 が逼迫し、16 GB DIMM 単体が ~18,000 円台 (セール時)、64 GB 換装は **実勢 4〜7 万円**。2025 年前半までは 1 万円台で 64 GB 化が可能だったが、現状大きく乖離。供給回復は 2027 後半以降との見方が多い ([Tom's Hardware: RAM price index 2026](https://www.tomshardware.com/pc-components/ram/ram-price-index-2026-lowest-price-on-ddr5-and-ddr4-memory-of-all-capacities))。
 2. **2.5 GbE NIC**: Realtek RTL8125B 系の安価カードで 1 GbE → 2.5 GbE 化。Longhorn replica の同期で恩恵
 3. **NVMe 増設**: マザー上の 2nd M.2 スロット (もしあれば) で OS と VM 領域を物理分離
 4. **PVE クラスタ化**: 同型機 (EliteDesk 800 G4 SFF) をジャンク調達 → 2 ノード化、HA 検証。corosync は既に入っているので追加コストは低い
