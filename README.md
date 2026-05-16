@@ -43,9 +43,16 @@
 ├── .env.example                  ← .env のテンプレート
 ├── docs/                         ← 運用ドキュメント
 │   ├── hardware.md                    ← ハードウェア詳細 + storage tier 設計
-│   ├── proxmox-zabbix-monitoring.md   ← Phase 1-6 構築記録 + 運用知見
+│   ├── proxmox-firewall.md            ← PVE Firewall 運用・ロックアウト復旧
+│   ├── admin-vm-tooling.md            ← admin-vm の pct/qm/pvesh ラッパー
+│   ├── internal-dns.md                ← Technitium dns/dns2 (Primary/Secondary + DHCP)
+│   ├── internal-tls.md                ← step-ca + サービス TLS 自動更新
+│   ├── puter-selfhost.md              ← Puter (LXC 102) セルフホスト
+│   ├── rke2-cluster.md                ← RKE2 クラスタの workload と最適化履歴
+│   ├── proxmox-zabbix-monitoring.md   ← Zabbix Phase 1-6 構築記録 + 運用知見
 │   ├── homelab-git-workflow.md        ← Git 運用ルール
-│   └── github-post-setup.md           ← GitHub 設定の継続作業
+│   ├── github-post-setup.md           ← GitHub 設定の継続作業
+│   └── remaining-tasks.md             ← 残タスク一覧
 ├── scripts/                      ← デプロイ・運用スクリプト
 │   ├── git-hooks/                     ← Git hooks の正本（install-hooks.sh で symlink）
 │   │   └── pre-commit
@@ -61,9 +68,22 @@
 
 ## クイックリファレンス
 
-- **構築経緯と運用知見**: [docs/proxmox-zabbix-monitoring.md](docs/proxmox-zabbix-monitoring.md)
+### システム基盤
+- **ハードウェア構成**: [docs/hardware.md](docs/hardware.md)
+- **PVE Firewall 運用**: [docs/proxmox-firewall.md](docs/proxmox-firewall.md)
+- **admin-vm 運用ツール**: [docs/admin-vm-tooling.md](docs/admin-vm-tooling.md)
+
+### サービス
+- **内部 DNS (Technitium)**: [docs/internal-dns.md](docs/internal-dns.md)
+- **内部 TLS / PKI (step-ca)**: [docs/internal-tls.md](docs/internal-tls.md)
+- **Puter セルフホスト**: [docs/puter-selfhost.md](docs/puter-selfhost.md)
+- **RKE2 クラスタ**: [docs/rke2-cluster.md](docs/rke2-cluster.md)
+- **Zabbix 監視 (Phase 1-6 構築記録)**: [docs/proxmox-zabbix-monitoring.md](docs/proxmox-zabbix-monitoring.md)
+
+### 運用・リポジトリ
 - **Git ワークフロー**: [docs/homelab-git-workflow.md](docs/homelab-git-workflow.md)
 - **GitHub 継続作業**: [docs/github-post-setup.md](docs/github-post-setup.md)
+- **残タスク一覧**: [docs/remaining-tasks.md](docs/remaining-tasks.md)
 
 ## 運用ルール
 
