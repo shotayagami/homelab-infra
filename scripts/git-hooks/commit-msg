@@ -1,0 +1,27 @@
+#!/bin/bash
+# commit-msg hook: コミットメッセージ本文に個人識別情報が混入していないかチェック
+#
+# このファイルはリポジトリで管理される「正本」。bash scripts/install-hooks.sh で有効化。
+#
+# 動機:
+#   pre-commit は staged blob 内容のみ検査するため、commit message に書いた
+#   `/home/t-ando/...` のような文字列はすり抜ける。Public 化後の filter-repo 3 回目で
+#   commit message 由来の漏出を検知したため、message 側もブロックする。
+#
+# 引数: $1 = commit message が書かれた一時ファイルのパス
+set -e
+
+MSG_FILE="$1"
+IDENTITY_PATTERN='(t-ando|takao\.andoh)'
+
+if grep -IqE "$IDENTITY_PATTERN" "$MSG_FILE" 2>/dev/null; then
+  echo "ERROR: コミットメッセージに個人識別情報 (t-ando / takao.andoh) が含まれています:" >&2
+  grep -InE "$IDENTITY_PATTERN" "$MSG_FILE" 2>/dev/null | head -3 | sed 's|^|  |' >&2
+  echo "" >&2
+  echo "  対処: t-ando → shotayagami、takao.andoh@... → <your-email> に置換してください。" >&2
+  echo "  メッセージ編集: 上記エラー後、再 commit すれば編集画面に戻れます。" >&2
+  echo "  バイパス (非推奨): git commit --no-verify" >&2
+  exit 1
+fi
+
+exit 0
