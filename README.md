@@ -4,16 +4,19 @@
 
 ## 主要対象
 
-| 役割 | LXC ID | IP | 概要 |
-|---|---|---|---|
-| Proxmox VE 9.1 (ハイパーバイザ) | — | 192.168.11.11 | Debian 13 ベース |
-| Zabbix 7.0 LTS | 190 | 192.168.11.55 | 監視サーバ + Web UI + PostgreSQL 16 |
-| ntfy 2.22 | 191 | 192.168.11.56 | モバイル push 通知、CF Tunnel 公開 |
-| dns / dns2 (Technitium DNS) | 104 / 105 | 192.168.11.53 / .54 | 内部 DNS Primary/Secondary |
-| step-ca | 107 | 192.168.11.61 | 内部 PKI (smallstep) |
-| nextcloud | 108 | 192.168.11.62 | ファイル共有 + Office |
-| pg-db | 106 | 192.168.11.60 | アプリ用 PostgreSQL |
-| puter | 102 | (停止中) | セルフホスト Internet OS |
+| 役割 | VMID/CTID | 種別 | IP | 概要 |
+|---|---|---|---|---|
+| Proxmox VE 9.1 (ハイパーバイザ) | — | host | 192.168.11.11 | Debian 13 ベース |
+| Zabbix 7.0 LTS | 190 | LXC | 192.168.11.55 | 監視サーバ + Web UI + PostgreSQL 16 |
+| ntfy 2.22 | 191 | LXC | 192.168.11.56 | モバイル push 通知、CF Tunnel 公開 |
+| dns / dns2 (Technitium DNS) | 104 / 105 | LXC | 192.168.11.53 / .54 | 内部 DNS Primary/Secondary |
+| step-ca | 107 | LXC | 192.168.11.61 | 内部 PKI (smallstep) |
+| nextcloud | 108 | LXC | 192.168.11.62 | ファイル共有 + Office |
+| pg-db | 106 | LXC | 192.168.11.60 | アプリ用 PostgreSQL |
+| puter | 102 | LXC | (停止中) | セルフホスト Internet OS |
+| k8s-cp1 (RKE2 control plane) | 110 | VM | 192.168.11.80 | RKE2 v1.34.3、ArgoCD/Harbor/Gitea/Longhorn 等を載せる検証クラスタ |
+| k8s-worker1 (RKE2 worker) | 120 | VM | 192.168.11.83 | Longhorn replica ホスト (`store-sda` 上) |
+| admin-vm | 150 | VM | (PVE 経由 SSH) | 運用クライアント、`/usr/local/bin` に `pct/qm/pvesh/pveum` SSH ラッパー設置済 |
 
 ## ディレクトリ構成
 
@@ -111,9 +114,12 @@ Admin user の 3 media に同時配信
 - Phase 6: バックアップ + Config export + docs (v1.0.0)
 - Phase 4-B: Nextcloud 監視 (2026-05-15、ntfy/Discord/Mailgun 3 系統に実 trigger 配信を実証)
 - Phase 6-E: クレデンシャル rotation (2026-05-15、Mailgun/Discord/ntfy/Zabbix Admin/DNS PFX)
+- Phase 4-D: RKE2 クラスタ監視 (2026-05-16、Linux agent + `Kubernetes cluster state by HTTP` + Cilium pod 網への static route で 3397 items 取得)
+- RKE2 etcd 安定化 (2026-05-16、cp1 を NVMe `local-lvm` / worker1 を `store-sda` SPCC SSD に live migrate、Fanxiang QLC は backup 専用に)
 
 未完了:
 - dns2 の DoT/DoH 再有効化（Technitium 15.x の cert load 不具合の追跡、Issue #3）
+- 残タスク全体は [docs/remaining-tasks.md](docs/remaining-tasks.md) を参照
 
 ## ライセンス
 
