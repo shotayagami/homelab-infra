@@ -369,14 +369,14 @@ metadata:
 即時(deployment env 直接更新、`helm upgrade` まで保持):
 ```bash
 kubectl -n trivy-system set env deploy/trivy-operator \
-  OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT=2 OPERATOR_SCAN_JOB_RETRY_AFTER=60s
+  OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT=2
 ```
 
-恒久(`helm upgrade` 用 values.yaml):
+恒久(`helm upgrade` 用 values.yaml、chart `aquasecurity/trivy-operator` 0.31.0):
 ```yaml
 operator:
   scanJobsConcurrentLimit: 2
-  scanJobRetryAfter: 60s
+  # scanJobsRetryDelay: 30s  # default、必要時のみ調整
 trivy:
   resources:
     limits:
@@ -386,6 +386,22 @@ trivy:
       cpu: 100m
       memory: 256Mi
 ```
+
+呼び出し例:
+```bash
+helm upgrade trivy-operator trivy-operator \
+  --repo https://aquasecurity.github.io/helm-charts/ \
+  --version 0.31.0 -n trivy-system \
+  --reuse-values --set operator.scanJobsConcurrentLimit=2 --wait
+```
+
+> **chart 0.31.0 の values key 命名注意**: env var 名と helm values key が綺麗に対応しない。例:
+> - `OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT` ← `operator.scanJobsConcurrentLimit`
+> - `OPERATOR_SCAN_JOB_RETRY_AFTER` ← `operator.scanJobsRetryDelay` (× `scanJobRetryAfter`)
+>
+> 確認には `helm template <release-name> trivy-operator --repo <url> --version <ver> --set <key>=<val> | grep <ENV_NAME>` (Helm の引数順は `[NAME] [CHART]`) で env への落とし方を検証するのが確実。
+
+`helm upgrade` 後は `kubectl -n trivy-system get deploy trivy-operator -o jsonpath='{.spec.template.spec.containers[*].env[*].name}'` で deployment の explicit env を確認し、過去の `kubectl set env` による out-of-band override が残っていたら `kubectl -n trivy-system set env deploy/trivy-operator OPERATOR_X-` (末尾ハイフン) で削除して ConfigMap (=values.yaml) を単一の出所にする。
 
 **根本的改善 (未実施 / 次の打ち手):**
 - worker ノードの vCPU 増設(`k8s-worker1` 3 → 4 以上)
