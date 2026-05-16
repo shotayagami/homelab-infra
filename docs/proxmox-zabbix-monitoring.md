@@ -1,6 +1,6 @@
 # Proxmox 環境の死活監視 — Zabbix 導入記録
 
-最終更新: 2026-05-14
+最終更新: 2026-05-16
 
 ## 1. 目的と前提
 
@@ -249,12 +249,14 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 
 ### システム構成
 
-| 役割 | LXC ID | IP | 備考 |
-|---|---|---|---|
-| Zabbix Server + Web + DB | 190 | 192.168.11.55 | Zabbix 7.0 LTS + nginx + PostgreSQL 16, Ubuntu 24.04 |
-| ntfy notification server | 191 | 192.168.11.56 | ntfy 2.22.0, HTTPS (step-ca cert), CF tunnel 公開 `ntfy.yagamin.net` |
-| 監視対象 (Linux agent) | 104,105,107,108,190 | (各 IP) | DNS, step-ca, Nextcloud, Zabbix self |
-| 監視対象 (HTTP API) | (PVE 192.168.11.11) | - | `Proxmox VE by HTTP` テンプレ, monitoring@pve!ztoken |
+| 役割 | VMID/CTID | 種別 | IP | 備考 |
+|---|---|---|---|---|
+| Zabbix Server + Web + DB | 190 | LXC | 192.168.11.55 | Zabbix 7.0 LTS + nginx + PostgreSQL 16, Ubuntu 24.04 |
+| ntfy notification server | 191 | LXC | 192.168.11.56 | ntfy 2.22.0, HTTPS (step-ca cert), CF tunnel 公開 `ntfy.yagamin.net` |
+| 監視対象 (Linux agent, LXC) | 104,105,107,108,190 | LXC | (各 IP) | DNS, step-ca, Nextcloud, Zabbix self |
+| 監視対象 (Linux agent, VM) | 110, 120 | VM | 192.168.11.80, .83 | RKE2 control plane / worker (Phase 4-D 追加) |
+| 監視対象 (HTTP API: PVE) | — | host | 192.168.11.11 | `Proxmox VE by HTTP` テンプレ, monitoring@pve!ztoken |
+| 監視対象 (HTTP API: k8s) | `k8s-cluster` (10692) | virtual | https://192.168.11.80:6443 | `Kubernetes cluster state by HTTP` テンプレ、ServiceAccount + permanent token、3397 items |
 
 ### 通知経路
 
@@ -277,8 +279,14 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 | 5-A | ntfy 内部 HTTPS で `{$ZABBIX.URL}` 未定義エラー | グローバルマクロ事前定義 |
 | 5-B | Discord 組込テンプレを我々が parameters 上書きして壊した | **既存テンプレを使う場合は parameters いじらない**、必要なら別名で新規作成 |
 | 5-D | `mediatype.test` が Zabbix 7.0 API に存在しない | UI のテストボタン使用、または実 trigger で確認 |
+| 4-D | `Kubernetes cluster state by HTTP` の Script item が pod IP (10.42.x.x) に直接 HTTP → クラスタ外から到達不可で KSM 系 LLD が全滅 | Zabbix LXC に `10.42.0.0/24 via cp1`, `10.42.1.0/24 via worker1` の static route を入れる。systemd oneshot で永続化 |
+| 4-D | KSM `/metrics` が 1.6MB と大きく Zabbix 7.0 default の 3s timeout で切れる | global `timeout_script=30s`, `timeout_http_agent=30s`, `connect_timeout=10s`, `socket_timeout=30s` に引き上げ |
+| 4-D | 計画 reboot で leader-elect 系コントローラの crashloop alert が大量に湧く | テンプレ側 LLD override (`Suppress crashloop alerts for leader-elected controllers`) + 計画作業時は `maintenance.create` で 抑止 |
+| 4-D | cp1 の etcd で `slow fdatasync` 多発 → controller の self-exit | VM 110 raw を Fanxiang QLC (store-sdb) → NVMe (local-lvm) に `qm move-disk` でオンライン移行。詳細は §8 |
 
 ### 業務本番化チェックリスト
+
+> 残タスクの一覧は [remaining-tasks.md](./remaining-tasks.md) で別途集約管理。
 
 - [ ] Zabbix Admin パスワード強度（既に強化済か再確認）
 - [ ] Mailgun SMTP credential のローテーション (Mailgun ダッシュボード)
@@ -287,6 +295,7 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 - [ ] バックアップを外部ストレージに同期するスクリプト (rsync, restic, rclone 等)
 - [ ] PVE firewall 再有効化検討（現状 enable: 0）
 - [x] ~~Phase 4-B: Nextcloud 監視~~ → 2026-05-15 完了 (§8.2 参照)
+- [x] ~~Phase 4-D: RKE2 クラスタ監視~~ → 2026-05-16 完了 (§8.5 参照)
 - [ ] dns2 の DoT/DoH 再有効化検討（Technitium 15.x の挙動次第）
 
 ### 参考リンク
@@ -433,6 +442,132 @@ CF Tunnel   ──HTTP 80──► 127.0.0.1:80      (loopback only)  ──► 
 - **API 一括設定**: `host.update` の `inventory.location_lat`/`location_lon` で全ホストに座標投入可
 - **タイルプロバイダ**: デフォルト OSM (無料)、Mapbox/MapTiler は有料
 - **実施 (2026-05-15)**: 全ホストに座標 `<masked-location> (lat=<masked-lat>, lon=<masked-lon>)` を API 一括設定。スクリプト保存先: [/home/shotayagami/proxmox-zabbix-set-host-location.sh](/home/shotayagami/proxmox-zabbix-set-host-location.sh)。今後の拠点増設時はこのスクリプトをコピペで複製、`LAT/LON/LOCATION` を編集 → 該当 host group に絞って実行が可能。
+
+### 2026-05-16: Phase 4-D RKE2 クラスタ監視
+
+#### 経緯
+- PVE 上の RKE2 クラスタ (VMID 110 `k8s-cp1` / VMID 120 `k8s-worker1`、v1.34.3-rke2r3) が **97 日稼働で 23 Helm release / ~110 pods** を抱える「検証環境という名の小規模本番級」状態で、PVE ホストの memory peak 92.9% / load 12.46 まで跳ねる事態だった
+- Zabbix で pod 単位までメトリクスを取れるようにして最適化作業 (Phase 0/1/2) の効果検証ができる土台を作る、というのが本フェーズのゴール
+
+#### 反映内容 (3 段構成)
+
+**Layer 1: Linux agent 監視 (k8s-cp1 / k8s-worker1)**
+- 両 VM に `zabbix-agent2 1:7.0.26-2+ubuntu22.04` 導入、`Server=192.168.11.55` / `Hostname=k8s-cp1`,`k8s-worker1`
+- Zabbix host: `k8s-cp1` (hostid=10690), `k8s-worker1` (hostid=10691)
+- Group: `Linux servers` (groupid=2)、Template: `Linux by Zabbix agent` (templateid=10001)
+
+**Layer 2: Kubernetes by HTTP テンプレ (k8s-cluster ホスト)**
+- Zabbix host: `k8s-cluster` (hostid=10692)、Group: `Kubernetes` (groupid=23, 新規)
+- Template: `Kubernetes cluster state by HTTP` (templateid=10510) + 5 サブテンプレ
+- ServiceAccount: `monitoring/zabbix-monitoring` + 専用 ClusterRole (nodes/services/services/proxy ほか全 read 系)
+- 永続 token Secret: `monitoring/zabbix-monitoring-token` (RKE2 v1.34 で動作)
+- マクロ:
+  - `{$KUBE.API.URL}` = `https://192.168.11.80:6443`
+  - `{$KUBE.API.TOKEN}` = Secret macro
+  - `{$KUBE.STATE.ENDPOINT.NAME}` = `prometheus-stack-kube-state-metrics`
+- 結果: **LLD で 3397 items 自動生成** (pod / namespace / deployment / PV / kubelet 系含む)
+
+**Layer 3: Cilium pod network への static route (ハマりポイント)**
+- 公式テンプレの Script item は `endpoints` API で取った **pod IP (10.42.0.x) に直接 HTTP** する設計。クラスタ外の Zabbix LXC から pod 網に到達できず、最初は KSM 系 LLD が `cannot get URL: Timeout was reached` で全滅
+- 解決: Zabbix LXC (190, 192.168.11.55) に static route を追加
+  ```
+  10.42.0.0/24 via 192.168.11.80  (cp1)
+  10.42.1.0/24 via 192.168.11.83  (worker1)
+  ```
+- 永続化: systemd oneshot `/etc/systemd/system/k8s-pod-routes.service` (After=network-online.target、`ip route replace ...` を ExecStart)
+- RKE2 default Cilium は外部からの forward traffic を許可していたので route だけで開通。BGP / native routing 不要
+
+#### Global timeout 調整
+- 公式テンプレが大きい KSM `/metrics` (1.6MB, 11127 行) を回すので、Zabbix 7.0 の global timeout を引き上げ:
+  - `timeout_script` = 30s (元 3s)
+  - `timeout_http_agent` = 30s
+  - `connect_timeout` = 10s
+  - `socket_timeout` = 30s
+- 他テンプレを増やす際もこの設定は流用可能
+
+#### 教訓
+- 「KSM 系だけタイムアウト」が出たら **pod IP への経路が無い** ことを疑う。`curl http://<pod-IP>:8080/metrics` を Zabbix LXC から打って即判定可能
+- token はチャットに貼らない。`/root/.zabbix-k8s-token` (chmod 600) に保管、必要に応じてローテ
+- 関連 memory: `proxmox_zabbix_k8s_monitoring.md`, `proxmox_rke2_cluster.md`
+
+### 2026-05-16: cp1 etcd slow fdatasync 解消 (VM disk live migration)
+
+#### 観測されたパターン
+- Phase 4-D 監視を入れた直後の 2026-05-16 15:30 JST、Zabbix から RKE2 cluster の crashloop alert が **9 件連続発火 → 10 分で resolved**
+- cp1 (VMID 110) で `etcd` の WAL `slow fdatasync` が 1〜10 秒で頻発（5.5h で 46 件、毎時 1〜8 件のペース）
+- 連続 5〜10 秒の fsync 遅延が発生 → leader-elect renew deadline (10s) を超え、**リーダー選出系コントローラが exit 1 → kubelet が即再起動** という挙動
+- 巻き込まれる pod: `kube-controller-manager`, `kube-scheduler`, `cloud-controller-manager`, `rke2-snapshot-controller`, `kyverno-{admission,background,cleanup,reports}-controller`, `cilium-operator-*`, `longhorn` の `csi-snapshotter` / `external-attacher`
+- **etcd / kube-apiserver / VM は再起動していない**、controller の self-exit だけ
+
+#### 根本原因
+- PVE host の `/dev/sdb` (`store-sdb`) は **Fanxiang S101Q 1TB SATA SSD** (consumer DRAMless QLC 級)
+- そこに VM 110 raw (200G, etcd WAL を含む) + VM 120 raw (250G, Longhorn replica を含む) + LXC backup dump が同居
+- consumer QLC は持続 fsync が弱く、複数 writer 競合で秒オーダーの遅延が発生
+
+#### 実施した対応 (3 段)
+
+1. **vm-health-monitor の VMID 121 ターゲット停止** — PVE ホストの `/etc/vm-health-monitor/targets.conf` で `121 vm 192.168.11.84 k8s-worker2` 行をコメントアウト (存在しない VM を毎分 ping → `qm reset` 失敗が大量ログを出していた)。`systemctl restart vm-health-monitor.service` で反映
+
+2. **Zabbix crashloop アラートで leader-election 系を除外** — `Kubernetes cluster state by HTTP` テンプレ (itemid=40029) の Pod discovery に LLD override 1 件追加 (`Suppress crashloop alerts for leader-elected controllers`)
+   - `{#NAME}` 正規表現で `kube-(controller-manager|scheduler)`, `cloud-controller-manager`, `cilium-operator-`, `kyverno-*-controller-`, `rke2-snapshot-controller-`, `csi-(snapshotter|attacher|resizer|provisioner)-` に match → trigger prototype `Pod is crash looping` を `opdiscover.discover=1` で生成抑止
+   - 既存 22 件の discovered trigger は `task.create type=6` で LLD 即時再評価し自動消滅
+   - **編集場所はテンプレ側 (10510)**。ホスト側 (53126) は read-only
+
+3. **VM disk のオンラインライブ移行 (qm move-disk)**
+   - VM 110 (k8s-cp1): `qm move-disk 110 scsi0 local-lvm --delete 1` で online live mirror、3 分 39 秒で完了。VM/etcd ともに無停止 (etcd container attempt は 18 のまま)
+   - VM 120 (k8s-worker1): `qm move-disk 120 scsi0 store-sda --delete 1` で 5 分 34 秒。store-sda は SPCC SSD 512GB (fsync ベンチで Fanxiang の約 2 倍)。worker1 / Longhorn ともに無停止、volume 全部 healthy 維持
+
+#### 最終的な物理配置 (2026-05-16 終了時)
+
+| デバイス | 容量・銘柄 | 用途 | 使用 |
+|---|---|---|---|
+| `nvme0n1` | Samsung 970 EVO Plus 1TB | PVE root + local-lvm 上の全 LXC + cp1 (200GB) | 173GB |
+| `sda` (store-sda) | SPCC SSD 512GB | worker1 (250GB) | 147GB / 残 318GB |
+| `sdb` (store-sdb) | Fanxiang QLC 1TB | **vzdump backups のみ** | 66GB / 残 867GB |
+
+- cp1 (etcd ホスト) と worker1 (Longhorn replica ホスト) が物理 disk レベルで分離
+- Fanxiang は事実上バックアップ専用に格下げ
+
+#### 結果
+- cp1 移行完了 (07:13:24 UTC) から 9 分時点で `slow fdatasync` イベント 0 (移行前は 6h で 46 件)
+- 解消の見込み大、最終確認は数時間後の経過観察で
+
+#### 教訓 / How to apply
+- Zabbix で似た crashloop バースト alert が来たら、**VM や etcd が落ちたわけではない** ことを最初に切り分け:
+  1. `kubectl -n kube-system get pods` で `*-k8s-cp1` 系の RESTARTS と `(Nm ago)` を確認
+  2. `etcd-k8s-cp1` / `kube-apiserver-k8s-cp1` の RESTARTS が増えていないことを確認（これらが増えていれば別問題）
+  3. etcd container log を `crictl logs` で取り `grep "slow fdatasync"` で頻度確認
+- 設定の場所:
+  - vm-health-monitor 本体: `/usr/local/bin/vm-health-monitor.sh`、設定: `/etc/vm-health-monitor/targets.conf`、unit: `/etc/systemd/system/vm-health-monitor.service`
+  - Zabbix API は `ZBX_API_TOKEN` (`~/.env`) + `https://192.168.11.55/api_jsonrpc.php` (Authorization: Bearer)
+- 計画 reboot 時は host を maintenance window に入れて alert 抑止 (override で抑止していない DaemonSet/StatefulSet 系 = longhorn-manager, longhorn-csi-plugin, metallb-speaker, alertmanager 等で crashloop alert が発火する):
+  ```bash
+  NOW=$(date +%s); END=$((NOW + 1800))
+  source ~/.env
+  curl -sL -X POST -H "Content-Type: application/json-rpc" -H "Authorization: Bearer $ZBX_API_TOKEN" \
+    https://192.168.11.55/api_jsonrpc.php -k -d "{
+      \"jsonrpc\":\"2.0\",
+      \"method\":\"maintenance.create\",
+      \"params\":{
+        \"name\":\"cp1 planned reboot $(date -Iseconds)\",
+        \"active_since\":$NOW,
+        \"active_till\":$END,
+        \"maintenance_type\":1,
+        \"hosts\":[{\"hostid\":\"10690\"},{\"hostid\":\"10692\"}],
+        \"timeperiods\":[{\"timeperiod_type\":0,\"start_date\":$NOW,\"period\":1800}]
+      },\"id\":1}"
+  # 10690=k8s-cp1, 10691=k8s-worker1, 10692=k8s-cluster
+  # maintenance_type 1=no data collection (alert+データ両方止め), 0=alert のみ止め
+  ```
+- SPCC SSD (store-sda) も consumer 級なので、worker1 のワークロードが重くなったら NVMe (local-lvm 残 562GB) への退避が次の手
+- 関連 memory: `proxmox_rke2_etcd_fsync.md`, `proxmox_rke2_cluster.md`
+
+### 2026-05-16: KubeJobFailed 過渡的失敗の掃除 (運用ノート)
+
+- Phase 0/1/2 最適化 (VM 再起動 + Longhorn replica patch 等) の時間帯に、`backups/mariadb-backup`, `backups/redis-backup`, `longhorn-system/daily-snapshot`, `longhorn-system/weekly-snapshot` の各 1 回が **Failed** 状態で残った
+- いずれも後続ジョブは Complete、CronJob は SUSPEND=False で健全 → 過渡的失敗で確定
+- 対処: `kubectl -n <ns> delete job <name>` で 4 件削除して `KubeJobFailed` alert を resolve
+- 教訓: 大規模オペレーション (VM 再起動 / Longhorn replica patch / namespace scale 0) の直後は `kubectl get jobs -A | grep Failed` をワンスショットで掃除する流れにする
 
 
 <!-- 以降、作業を進めるごとに追記 -->
