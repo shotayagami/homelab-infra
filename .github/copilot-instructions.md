@@ -30,7 +30,7 @@
    - Markdown 内のファイルパス・コマンド・VMID 等の値が実態と乖離していないか。
 4. **PVE / インフラ固有の落とし穴**
    - Firewall ルール変更時に SSH/8006 の ACCEPT が消えていないか (ロックアウト防止)。
-   - LXC で DHCP サーバを立てる場合の `IN ACCEPT -p udp -dport 67` 漏れ。
+   - LXC で DHCP サーバを立てる場合の `INPUT ACCEPT -p udp --dport 67` 漏れ。
    - RKE2 / etcd 関連の disk fsync 性能を意識した配置になっているか。
 5. **PR 粒度とコミットメッセージ**
    - 1 PR = 1 つの論理変更になっているか。
