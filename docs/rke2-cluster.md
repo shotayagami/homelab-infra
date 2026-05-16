@@ -199,6 +199,56 @@ silence ID は `amtool ... silence query` で確認できる。
 2. **Helm values で `defaultRules.disabled.KubeCPUOvercommit: true` に切り替えた場合** — silence は不要になる
 3. **2027-05-16 にサイレンス期限切れ** — 再評価して再延長か恒久対応か判断
 
+### このアラートは「リソース削減」では実用上消せない (2026-05-16 検討記録)
+
+検討中に通った誤った経路と、その先の実現可能性評価を残しておく。将来同じ検討を繰り返さないための記録。
+
+**❌ host メモリの解放は KubeCPUOvercommit に直接影響しない**
+
+ルールは pod の `requests.cpu` と node の `allocatable.cpu` のみを参照する。本アラートの解消を目的に VM の memory trim (OMV 2048→1536 MB 等) を実施しても、CPU 軸には 1 mCPU も影響しない。検討の途中で一度この誤った前提に立ったため、明示的に注意点として残す。
+
+**△ pod の CPU requests を下げて 3000m 未満を狙うのは数学的には可能だが、実用上は不可**
+
+RKE2 制御プレーン + Longhorn など、削減できないか削減するとサービス影響が大きい下限要素を集計すると以下のようになる:
+
+| Pod / コンポーネント | requests.cpu | 削減可否 |
+|---|---|---|
+| kube-apiserver-k8s-cp1 | 250m | 不可 (RKE2 static pod) |
+| kube-proxy × 2 (cp1+worker1) | 500m | 不可 (RKE2 DaemonSet) |
+| etcd-k8s-cp1 | 200m | 不可 (RKE2 static pod) |
+| kube-controller-manager | 200m | 不可 (RKE2 static pod) |
+| kube-scheduler | 100m | 不可 (RKE2 static pod) |
+| cloud-controller-manager | 100m | 不可 (RKE2 static pod) |
+| Longhorn instance-manager × 2 | 480m + 360m | 不可 (ストレージ I/O 性能担保) |
+| rke2-ingress-nginx × 2 | 200m | 削減検討余地あるが影響大 |
+| rke2-coredns × 2 | 200m | 同上 |
+| **下限合計 (削れない / 削るとサービス影響大)** | **~2590m** | — |
+
+下限 2590m に対して閾値は 3000m なので、**残り 410m が application pod に許容される予算**となる。
+
+| | mCPU |
+|---|---|
+| 削れない下限 | 2590m |
+| 閾値 | 3000m |
+| application pod に許される枠 | **410m** |
+| 現在の application pod 合計 (cloudflared / kyverno / gitea / DB 系 / argocd / velero など) | **~2100m** |
+| 削減が必要な量 | **~1690m** |
+
+つまり application pod 群を現状 2100m から **410m 以下** まで圧縮すれば数学的にはアラート消失。が、kyverno (4 コントローラ × 100m = 400m) だけで予算をほぼ使い切るうえ、cloudflared / argocd / gitea / 各種 DB / monitoring を 0 近傍まで絞れば多くのサービスがスロットリングで実害を出す。
+
+**結論**: 1 control-plane + 1 worker トポロジでは **`KubeCPUOvercommit` は実用上発火し続けるアラート** (数学的には消せるが、消すとサービスを壊す)。サイレンス継続、または Helm values での恒久無効化が現実解。
+
+### 恒久対応の選択肢 (実施は保留)
+
+```yaml
+# kube-prometheus-stack values.yaml
+defaultRules:
+  disabled:
+    KubeCPUOvercommit: true
+```
+
+これで Prometheus rule の生成自体が停止し、Alertmanager サイレンスも不要になる。**今回は実施保留** (現状の amtool silence で運用継続) だが、次の Helm upgrade 機会か、サイレンスが切れる 2027-05-16 までに判断する。
+
 ### worker2 追加の現状フィージビリティ (2026-05-16 時点)
 
 「本格対応 = worker2 追加」のリソース感:
@@ -210,7 +260,7 @@ silence ID は `amtool ... silence query` で確認できる。
 | Storage (local-lvm) | 658 GiB free | 余裕 |
 | Network | 1 GbE 1 本 | Longhorn replica 同期で帯域逼迫の懸念 |
 
-→ **メモリが瓶頸**。先に [docs/hardware.md](hardware.md) §「将来の拡張余地」記載の **64 GB DIMM 換装** をやらないと worker2 は危険。
+→ **メモリがボトルネック**。先に [docs/hardware.md](hardware.md) §「将来の拡張余地」記載の **64 GB DIMM 換装** をやらないと worker2 は危険。
 
 > ⚠ **2026 年 DRAM 価格高騰**: AI 向け HBM への製造シフトで DDR4 が逼迫。2025Q4→2026Q1 で DRAM 価格 80-90% QoQ、DDR4 32 GB kit が ~2-3 倍に。Silicon Power 等の 16 GB DIMM 単体で 2026 年 5 月時点 ~18,000 円台 (セール時)。**16 GB × 4 = 64 GB 換装は実勢 4〜7 万円**を見ておくのが現実的 (hardware.md の「1 万円台」は執筆当時の旧相場で、現状では大幅に乖離)。供給回復は 2027 後半以降との見方が多い。
 
