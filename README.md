@@ -28,7 +28,7 @@
 | dns / dns2 (Technitium DNS) | 104 / 105 | LXC | 192.168.11.53 / .54 | 内部 DNS Primary/Secondary |
 | step-ca | 107 | LXC | 192.168.11.61 | 内部 PKI (smallstep) |
 | nextcloud | 108 | LXC | 192.168.11.62 | ファイル共有 + Office |
-| pg-db | 106 | LXC | 192.168.11.60 | アプリ用 PostgreSQL |
+| pg-db | 106 | LXC | 192.168.11.60 | アプリ用 PostgreSQL 17 (RKE2 上の Django アプリの外部 DB) |
 | puter | 102 | LXC | (停止中) | セルフホスト Internet OS |
 | k8s-cp1 (RKE2 control plane) | 110 | VM | 192.168.11.80 | RKE2 v1.34.3、ArgoCD/Harbor/Gitea/Longhorn 等を載せる検証クラスタ |
 | k8s-worker1 (RKE2 worker) | 120 | VM | 192.168.11.83 | Longhorn replica ホスト (`store-sda` 上) |
@@ -48,6 +48,7 @@
 │   ├── internal-dns.md                ← Technitium dns/dns2 (Primary/Secondary + DHCP)
 │   ├── internal-tls.md                ← step-ca + サービス TLS 自動更新
 │   ├── puter-selfhost.md              ← Puter (LXC 102) セルフホスト
+│   ├── pg-db-postgresql.md            ← pg-db (LXC 106) アプリ用 PostgreSQL 17
 │   ├── rke2-cluster.md                ← RKE2 クラスタの workload と最適化履歴
 │   ├── proxmox-zabbix-monitoring.md   ← Zabbix Phase 1-6 構築記録 + 運用知見
 │   ├── homelab-git-workflow.md        ← Git 運用ルール
@@ -77,6 +78,7 @@
 - **内部 DNS (Technitium)**: [docs/internal-dns.md](docs/internal-dns.md)
 - **内部 TLS / PKI (step-ca)**: [docs/internal-tls.md](docs/internal-tls.md)
 - **Puter セルフホスト**: [docs/puter-selfhost.md](docs/puter-selfhost.md)
+- **pg-db (アプリ用 PostgreSQL)**: [docs/pg-db-postgresql.md](docs/pg-db-postgresql.md)
 - **RKE2 クラスタ**: [docs/rke2-cluster.md](docs/rke2-cluster.md)
 - **Zabbix 監視 (Phase 1-6 構築記録)**: [docs/proxmox-zabbix-monitoring.md](docs/proxmox-zabbix-monitoring.md)
 
