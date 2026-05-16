@@ -399,9 +399,9 @@ helm upgrade trivy-operator trivy-operator \
 > - `OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT` ← `operator.scanJobsConcurrentLimit`
 > - `OPERATOR_SCAN_JOB_RETRY_AFTER` ← `operator.scanJobsRetryDelay` (× `scanJobRetryAfter`)
 >
-> 確認には `helm template --repo <url> --version <ver> trivy-operator <name> --set <key>=<val> | grep <ENV_NAME>` で env への落とし方を検証するのが確実。
+> 確認には `helm template <release-name> trivy-operator --repo <url> --version <ver> --set <key>=<val> | grep <ENV_NAME>` (Helm の引数順は `[NAME] [CHART]`) で env への落とし方を検証するのが確実。
 
-`helm upgrade` 後は `kubectl -n trivy-system get deploy trivy-operator -o jsonpath='{.spec.template.spec.containers[*].env[*].name}'` で deployment の explicit env を確認し、過去の `kubectl set env` による out-of-band override が残っていたら `kubectl set env deploy/trivy-operator OPERATOR_X-` (末尾ハイフン) で削除して ConfigMap (=values.yaml) を単一の出所にする。
+`helm upgrade` 後は `kubectl -n trivy-system get deploy trivy-operator -o jsonpath='{.spec.template.spec.containers[*].env[*].name}'` で deployment の explicit env を確認し、過去の `kubectl set env` による out-of-band override が残っていたら `kubectl -n trivy-system set env deploy/trivy-operator OPERATOR_X-` (末尾ハイフン) で削除して ConfigMap (=values.yaml) を単一の出所にする。
 
 **根本的改善 (未実施 / 次の打ち手):**
 - worker ノードの vCPU 増設(`k8s-worker1` 3 → 4 以上)
