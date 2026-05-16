@@ -199,6 +199,42 @@ silence ID は `amtool ... silence query` で確認できる。
 2. **Helm values で `defaultRules.disabled.KubeCPUOvercommit: true` に切り替えた場合** — silence は不要になる
 3. **2027-05-16 にサイレンス期限切れ** — 再評価して再延長か恒久対応か判断
 
+### このアラートは「リソース削減」では消せない (2026-05-16 検討記録)
+
+過去に検討した思考の罠を残しておく。以下はすべて **試したが解決にならなかった、または初手から論理的に意味がない** ものなので、再発防止のため明示する。
+
+**❌ host メモリの解放は KubeCPUOvercommit に効かない**: ルールは pod の `requests.cpu` と node の `allocatable.cpu` だけを参照する。`KubeCPUOvercommit` の文脈で VM の memory trim (OMV 2048→1536 MB 等) を議論しても、CPU 軸には 1 mCPU も影響しない。一度この罠にハマったので注意。
+
+**❌ pod の CPU requests を下げて 3000m 未満を狙うのも不可**: RKE2 制御プレーン + Longhorn の "触れない床" だけで以下の通り 3000m に達してしまう。
+
+| Pod / コンポーネント | requests.cpu | 削減可否 |
+|---|---|---|
+| kube-apiserver-k8s-cp1 | 250m | 不可 (RKE2 static pod) |
+| kube-proxy × 2 (cp1+worker1) | 500m | 不可 (RKE2 DaemonSet) |
+| etcd-k8s-cp1 | 200m | 不可 (RKE2 static pod) |
+| kube-controller-manager | 200m | 不可 (RKE2 static pod) |
+| kube-scheduler | 100m | 不可 (RKE2 static pod) |
+| cloud-controller-manager | 100m | 不可 (RKE2 static pod) |
+| Longhorn instance-manager × 2 | 480m + 360m | 不可 (ストレージ I/O 性能担保) |
+| rke2-ingress-nginx × 2 | 200m | 削減検討余地あるが影響大 |
+| rke2-coredns × 2 | 200m | 同上 |
+| **床 (削れない / 削るとサービス影響大)** | **~2590m** | — |
+
+→ 仮に上記の床以外 (cloudflared / kyverno / その他 application pod 合計 ~2100m) を**全部ゼロに削っても床 2590m 残るため**、`sum(requests) - 3000 > 0` の構図は基本的に逃れられない。なお application 系を本格削減した場合は機能的に多くが死ぬ。
+
+**結論**: このクラスタトポロジ (1 control-plane + 1 worker) では **`KubeCPUOvercommit` は構造的に発火し続けるアラート**であり、サイレンス継続 or Helm values での恒久無効化が唯一現実的な対応。
+
+### 恒久対応の選択肢 (実施は保留)
+
+```yaml
+# kube-prometheus-stack values.yaml
+defaultRules:
+  disabled:
+    KubeCPUOvercommit: true
+```
+
+これで Prometheus rule の生成自体が停止し、Alertmanager サイレンスも不要になる。**今回は実施保留** (現状の amtool silence で運用継続) だが、次の Helm upgrade 機会か、サイレンスが切れる 2027-05-16 までに判断する。
+
 ### worker2 追加の現状フィージビリティ (2026-05-16 時点)
 
 「本格対応 = worker2 追加」のリソース感:
