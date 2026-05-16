@@ -94,5 +94,17 @@ WARN: gitleaks が未インストールです。pre-commit hook は簡易 regex 
 EOF
 fi
 
+# secretlint 依存チェック (Node.js devDependency)
+if [[ -x "$REPO_ROOT/node_modules/.bin/secretlint" ]]; then
+  echo "OK: secretlint $("$REPO_ROOT/node_modules/.bin/secretlint" --version 2>/dev/null) が利用可能。"
+else
+  cat >&2 <<'EOF'
+WARN: secretlint が未インストールです。pre-commit hook の Check 3 はスキップされます。
+
+  インストール:
+    cd "$(git rev-parse --show-toplevel)" && npm install
+EOF
+fi
+
 echo
 echo "=== 完了 ==="

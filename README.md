@@ -122,9 +122,20 @@
 ## 初期セットアップ（clone 直後）
 
 ```bash
-bash scripts/install-hooks.sh   # pre-commit hook を有効化 (gitleaks 連携)
+npm install                      # secretlint (devDependency) を取得
+bash scripts/install-hooks.sh   # pre-commit hook を有効化 (gitleaks + secretlint 連携)
 cp .env.example .env             # 値を埋める (CF/Zabbix tokens)
 ```
+
+機微情報スキャンは三層構成:
+
+| 層 | ツール | 起点 |
+|---|---|---|
+| 1. ローカル commit 前 | pre-commit hook 内の identity check / gitleaks / secretlint | `bash scripts/install-hooks.sh` |
+| 2. push 時 | GitHub Secret Scanning + Push Protection | リポジトリ Settings (既定で有効) |
+| 3. push 後 | GitHub CodeQL default setup (対象言語追加時に自動起動) | Settings > Code security > Default setup |
+
+> CodeQL は現状 Shell のみのため対象言語ゼロ。JavaScript / Python / Go 等を追加した時点で自動的に走り出す。
 
 `ZBX_API_TOKEN` は Zabbix UI → ユーザー → API トークン から発行 (User=Admin, 期限なし推奨)。
 Zabbix Admin に MFA 有効な環境では `user.login` の session が即 invalidate するため、
