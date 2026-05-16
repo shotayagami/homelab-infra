@@ -12,7 +12,7 @@
 | 主ストレージ | Samsung 970 EVO Plus 1 TB NVMe — `local-lvm` (LVM-thin 794 GB) + `local` |
 | 追加 SSD A | SPCC 480 GB SATA TLC — `store-sda` (RKE2 worker1 / Longhorn replica) |
 | 追加 SSD B | Fanxiang S101Q 1 TB SATA QLC — `store-sdb` (バックアップ専用) |
-| USB HDD | WDC 8/4 TB + Seagate 3/2 TB (コールドストレージ、未マウント) |
+| USB HDD ×4 | WDC 8/4 TB + Seagate 3/2 TB (計 ~15.6 TiB) — **OpenMediaVault VM (VMID 100) に disk passthrough**、PVE 側ではマウントしない |
 | NIC | Intel I219-LM オンボード 1 GbE → `vmbr0` 192.168.11.11/24 |
 | Hypervisor | Proxmox VE 9.1.11 / Kernel 6.17.13-8-pve |
 
@@ -23,6 +23,7 @@
 | 役割 | VMID/CTID | 種別 | IP | 概要 |
 |---|---|---|---|---|
 | Proxmox VE 9.1 (ハイパーバイザ) | — | host | 192.168.11.11 | Debian 13 ベース |
+| OpenMediaVault (NAS) | 100 | VM | (LAN 上) | USB HDD 4 台 (8/4/3/2 TB) を SATA1-4 として passthrough、SMB/NFS で配信 |
 | Zabbix 7.0 LTS | 190 | LXC | 192.168.11.55 | 監視サーバ + Web UI + PostgreSQL 16 |
 | ntfy 2.22 | 191 | LXC | 192.168.11.56 | モバイル push 通知、CF Tunnel 公開 |
 | dns / dns2 (Technitium DNS) | 104 / 105 | LXC | 192.168.11.53 / .54 | 内部 DNS Primary/Secondary |

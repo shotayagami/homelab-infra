@@ -36,8 +36,10 @@ i5-8500 は HT 非搭載のため物理 6 コア = 論理 6 スレッド。RKE2 
 | `nvme0n1` | Samsung 970 EVO Plus 1TB | 931.5 GiB | NVMe (PCIe 3.0 x4) | `local-lvm` (LVM-thin 794 GB) + `local` (96 GB) | **OS (`pve-root`) + 主要 VM/LXC ディスク + RKE2 cp1 etcd** |
 | `sda` | SPCC Solid State Disk | 476.9 GiB | SATA SSD (TLC 推定) | `store-sda` (dir, ext4) | RKE2 worker1 ルートディスク / Longhorn replica |
 | `sdb` | Fanxiang S101Q 1TB | 953.9 GiB | SATA SSD (QLC) | `store-sdb` (dir, ext4) | **バックアップ専用** (Zabbix dump / Config export) |
-| `sdc` | WDC WD80EAZZ-00BKLB0 | 7.3 TiB | USB 3.x HDD | (未登録) | コールドストレージ候補 (現状未マウント) |
-| `sdd`–`sdf` | 各種 WDC / Seagate HDD | 計 ~8 TiB | USB HDD (NTFS) | (未登録) | 旧データの保管、現状読み出しのみ |
+| `sdc` | WDC WD80EAZZ-00BKLB0 | 7.3 TiB | USB 3.x HDD | (PVE 非管理) | **OMV (VMID 100) に disk passthrough** → `sata1` |
+| `sdd` | WDC WD40EZAZ-00SF3B0 | 3.6 TiB | USB 3.x HDD | (PVE 非管理) | **OMV (VMID 100) に disk passthrough** → `sata4` |
+| `sde` | Seagate ST3000DM001-1ER166 | 2.7 TiB | USB 3.x HDD | (PVE 非管理) | **OMV (VMID 100) に disk passthrough** → `sata2` |
+| `sdf` | Seagate ST2000DM001-1CH164 | 1.8 TiB | USB 3.x HDD | (PVE 非管理) | **OMV (VMID 100) に disk passthrough** → `sata3` |
 
 ### Storage tier の決定経緯
 
@@ -57,7 +59,7 @@ i5-8500 は HT 非搭載のため物理 6 コア = 論理 6 スレッド。RKE2 
 - **`local` (NVMe / `/var/lib/vz`)**: ISO、CT template、vzdump backup の一時置き
 - **`store-sda` (SPCC SATA SSD)**: 性能が必要な「2 軍ストレージ」枠。worker1 ルート、Longhorn replica
 - **`store-sdb` (Fanxiang QLC SATA SSD)**: バックアップ専用。`vzdump` の保存先、Zabbix Config export
-- **USB HDD 群 (`sdc`–`sdf`)**: 現状コールドストレージ。NTFS 残骸は将来 ext4 化してアーカイブ用に統合予定
+- **USB HDD 群 (`sdc`–`sdf`)**: PVE 側ではマウントせず、`qm config 100` で `sata1`〜`sata4` として OpenMediaVault VM (VMID 100) に **disk passthrough** 済。OMV 内で ZFS/ext4 のプールを構成し、SMB/NFS で他 VM・LXC・物理クライアントから利用 (例: Nextcloud は `files_external` 経由で `/mnt/omv/nas/*` を参照していた経緯あり、`docs/proxmox-zabbix-monitoring.md` の Nextcloud 復旧ログ参照)。**PVE ホスト側で直接マウント/フォーマットしない** こと (OMV のファイルシステムを破壊する)
 
 ## ネットワーク
 
