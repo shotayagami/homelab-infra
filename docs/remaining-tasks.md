@@ -3,7 +3,7 @@
 **最終更新**: 2026-05-16 (RKE2 関連を追加)
 **前回棚卸し時に完了済**: Issue #5 (Nextcloud zabbix-monitor app password rotation)、Phase 4-D RKE2 監視、cp1 etcd fsync 解消
 
-GitHub Issues、`docs/proxmox-zabbix-monitoring.md` の業務本番化チェックリスト、`~/.claude/projects/-home-t-ando/memory/` の宿題記述を横断的に集約したもの。優先度は当面の運用影響と着手コストで仮置き。
+GitHub Issues、`docs/proxmox-zabbix-monitoring.md` の業務本番化チェックリスト、`~/.claude/projects/-home-shotayagami/memory/` の宿題記述を横断的に集約したもの。優先度は当面の運用影響と着手コストで仮置き。
 
 ---
 

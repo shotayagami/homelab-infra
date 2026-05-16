@@ -441,7 +441,7 @@ CF Tunnel   ──HTTP 80──► 127.0.0.1:80      (loopback only)  ──► 
   - System default: 管理 → 一般設定 → 地理マップ（タイルプロバイダ、デフォルト中心、最大ズーム等）
 - **API 一括設定**: `host.update` の `inventory.location_lat`/`location_lon` で全ホストに座標投入可
 - **タイルプロバイダ**: デフォルト OSM (無料)、Mapbox/MapTiler は有料
-- **実施 (2026-05-15)**: 全ホストに座標 `<masked-location> (lat=<masked-lat>, lon=<masked-lon>)` を API 一括設定。スクリプト保存先: [/home/t-ando/proxmox-zabbix-set-host-location.sh](/home/t-ando/proxmox-zabbix-set-host-location.sh)。今後の拠点増設時はこのスクリプトをコピペで複製、`LAT/LON/LOCATION` を編集 → 該当 host group に絞って実行が可能。
+- **実施 (2026-05-15)**: 全ホストに座標 `<masked-location> (lat=<masked-lat>, lon=<masked-lon>)` を API 一括設定。スクリプト保存先: [/home/shotayagami/proxmox-zabbix-set-host-location.sh](/home/shotayagami/proxmox-zabbix-set-host-location.sh)。今後の拠点増設時はこのスクリプトをコピペで複製、`LAT/LON/LOCATION` を編集 → 該当 host group に絞って実行が可能。
 
 ### 2026-05-16: Phase 4-D RKE2 クラスタ監視
 

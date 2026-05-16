@@ -58,7 +58,7 @@
 ### Step 1: リポジトリ初期化
 
 ```bash
-cd /home/t-ando
+cd /home/shotayagami
 mkdir -p homelab-infra/{docs,scripts,zabbix-configs}
 cd homelab-infra
 
@@ -119,12 +119,12 @@ git config user.email "<your-email>"
 ### Step 2: 既存ファイル取り込み
 
 ```bash
-cp /home/t-ando/proxmox-deploy-puter-cloudflare-access.sh    scripts/
-cp /home/t-ando/proxmox-setup-extra-storage-sda-sdb.sh       scripts/
-cp /home/t-ando/proxmox-zabbix-set-host-location.sh          scripts/
-cp /home/t-ando/proxmox-zabbix-monitoring.md                  docs/
-cp /home/t-ando/homelab-git-workflow.md                       docs/
-cp -r /home/t-ando/zabbix-configs/*                           zabbix-configs/
+cp /home/shotayagami/proxmox-deploy-puter-cloudflare-access.sh    scripts/
+cp /home/shotayagami/proxmox-setup-extra-storage-sda-sdb.sh       scripts/
+cp /home/shotayagami/proxmox-zabbix-set-host-location.sh          scripts/
+cp /home/shotayagami/proxmox-zabbix-monitoring.md                  docs/
+cp /home/shotayagami/homelab-git-workflow.md                       docs/
+cp -r /home/shotayagami/zabbix-configs/*                           zabbix-configs/
 ```
 
 ### Step 3: `.env.example` 作成
