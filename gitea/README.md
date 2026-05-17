@@ -48,26 +48,48 @@ cluster 内の他の ArgoCD Application は internal Gitea (`gitea.home.yagamin.
 
 ## 必要な Secret
 
-values.yaml と StatefulSet が以下の Secret を参照する。Secret は ArgoCD で管理しない (kubectl で out-of-band 作成)。
+values.yaml と StatefulSet が以下の Secret を参照する。Secret は **SealedSecret 経由で git 管理** (`k8s/overlays/production/sealed-secrets/`)。
 
 | Secret | キー | 用途 |
 |---|---|---|
 | `gitea-db` | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | gitea-postgres の初期化と Gitea からの接続 |
 | `gitea-redis` | `REDIS_PASSWORD` | gitea-redis の `requirepass` と Gitea からの接続 |
 
-将来的に SealedSecret 化することは未対応の宿題 (本リポジトリは Public のため平文 Secret は git 管理外)。
+cluster 内の `kube-system/sealed-secrets` controller (Bitnami sealed-secrets v0.34+) が公開鍵で暗号化されたペイロードを復号して plain Secret を生成する。本リポジトリには encryptedData のみが git 管理されているため、Public 公開でも漏洩しない。
+
+admin 認証情報は values.yaml の `gitea.admin.*` を空文字にすることでチャートの init container を skip させ、既存の Gitea 内部 admin user は手付かずにする (admin 変更は Gitea Web UI または `gitea admin user change-password` で行う)。
+
+### 新規 cluster での bootstrap
+
+新しい cluster (= 別の sealed-secrets keypair) では本リポジトリの SealedSecret manifest は復号できないため、新たに再暗号化が必要。手順:
 
 ```bash
-# 新規 cluster での Bootstrap (パスワードはランダム 24-byte hex)
+# kubeseal CLI (controller と同じバージョンを使うこと)
+SEALED_VER=0.34.0
+curl -fsSL -o /tmp/kubeseal.tgz \
+  "https://github.com/bitnami-labs/sealed-secrets/releases/download/v${SEALED_VER}/kubeseal-${SEALED_VER}-linux-amd64.tar.gz"
+tar -xzf /tmp/kubeseal.tgz -C /tmp
+install -m 0755 /tmp/kubeseal ~/bin/kubeseal
+
+# plain Secret を新しく作成 (random password)
 kubectl -n gitea create secret generic gitea-db \
   --from-literal=DB_NAME=gitea \
   --from-literal=DB_USER=gitea \
-  --from-literal=DB_PASSWORD="$(openssl rand -hex 24)"
-kubectl -n gitea create secret generic gitea-redis \
-  --from-literal=REDIS_PASSWORD="$(openssl rand -hex 24)"
+  --from-literal=DB_PASSWORD="$(openssl rand -hex 24)" \
+  --dry-run=client -o yaml \
+  | kubeseal --controller-name=sealed-secrets --controller-namespace=kube-system \
+      --format=yaml --namespace=gitea \
+  > gitea/k8s/overlays/production/sealed-secrets/gitea-db.yaml
+
+# gitea-redis も同様
+# 作成後 git commit + PR、マージで ArgoCD が apply
 ```
 
-admin 認証情報は values.yaml の `gitea.admin.*` を空文字にすることでチャートの init container を skip させ、既存の Gitea 内部 admin user は手付かずにする (admin 変更は Gitea Web UI または `gitea admin user change-password` で行う)。
+### パスワードのローテーション / 平文の取り出し
+
+ローテーション: 上記 bootstrap 手順で新しいパスワードを生成し、SealedSecret を PR で差し替える。既存の plain Secret は SealedSecret controller が `encryptedData` から再生成して上書きする。
+
+平文の取り出し: `kubectl -n gitea get secret <name> -o jsonpath='{.data.<KEY>}' | base64 -d`。admin-vm 等の外部にテキストファイルとして長期保管しない (漏洩リスクを増やすだけで意味がない)。
 
 ## デプロイ / アップグレード手順
 

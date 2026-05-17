@@ -5,6 +5,5 @@ namespace: gitea
 
 resources:
   - ../../base
-
-# Secrets (gitea-db, gitea-redis) are managed out-of-band with kubectl create.
-# Migrating them to SealedSecret is tracked as future work in the parent README.
+  - sealed-secrets/gitea-db.yaml
+  - sealed-secrets/gitea-redis.yaml

@@ -1,0 +1,12 @@
+# gitleaks ignore list
+#
+# 1 行 1 fingerprint。`<file>:<rule-id>:<line>` 形式。
+# 既存の fingerprint は `gitleaks protect --staged --verbose` 出力の
+# "Fingerprint:" 行をそのまま転記する。
+#
+# SealedSecret manifest の encryptedData は本来 git に置く前提で、
+# cluster 公開鍵により暗号化済み。Bitnami sealed-secrets controller が
+# cluster 内で復号して plain Secret を生成する設計のため、gitleaks の
+# generic-api-key (高 entropy base64) 検出は誤検出となる。
+gitea/k8s/overlays/production/sealed-secrets/gitea-redis.yaml:generic-api-key:9
+gitea/k8s/overlays/production/sealed-secrets/gitea-db.yaml:generic-api-key:10
