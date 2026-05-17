@@ -1,0 +1,83 @@
+# Gitea Helm chart values
+#
+# Chart : oci://docker.gitea.com/charts/gitea (version 12.5.0)
+# Target: RKE2 cluster, namespace `gitea`
+# Persistence: Longhorn RWO, 10Gi PVC `gitea-shared-storage`
+#
+# IMPORTANT: rollout strategy MUST remain `Recreate`.
+# Gitea embeds LevelDB queues under `/data/queues/common` on the RWO PVC.
+# Under RollingUpdate, the new pod tries to acquire the LevelDB lock while
+# the old pod is still alive, fails with
+#   "unable to lock level db ... resource temporarily unavailable"
+# and CrashLoopBackOff occurs, deadlocking the rollout.
+# Migrating database/queue/cache/session backends to PostgreSQL + Valkey
+# (see docs/rke2-workloads.md) would eliminate the constraint and allow
+# returning to RollingUpdate.
+strategy:
+  type: Recreate
+  rollingUpdate: null
+
+# admin section is intentionally empty so that the chart's init container
+# skips admin user creation/update logic. The existing admin user inside
+# the running Gitea instance is preserved as-is.
+# To rotate admin credentials, do so through Gitea's web UI or `gitea admin
+# user change-password`, not through this values file.
+gitea:
+  admin:
+    username: ""
+    password: ""
+    email: ""
+
+  config:
+    server:
+      DOMAIN: gitea.home.yagamin.net
+      ROOT_URL: https://gitea.home.yagamin.net
+    database:
+      DB_TYPE: sqlite3
+    cache:
+      ADAPTER: memory
+    session:
+      PROVIDER: memory
+    queue:
+      TYPE: level
+    actions:
+      ENABLED: true
+      DEFAULT_ACTIONS_URL: github
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: gitea.home.yagamin.net
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+        - gitea.home.yagamin.net
+      secretName: gitea-home-yagamin-net-tls
+
+persistence:
+  enabled: true
+  storageClass: longhorn
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+# Subchart dependencies disabled. Gitea uses its own embedded SQLite and
+# in-process LevelDB / memory backends for now (see strategy note above).
+postgresql:
+  enabled: false
+postgresql-ha:
+  enabled: false
+redis-cluster:
+  enabled: false
+valkey-cluster:
+  enabled: false
