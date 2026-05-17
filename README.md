@@ -54,6 +54,7 @@
 │   ├── rke2-cluster.md                ← RKE2 クラスタの workload と最適化履歴
 │   ├── rke2-workloads.md              ← RKE2 上のアプリカタログ (ICS / WordPress / Gitea / Harbor)
 │   ├── rke2-lessons-learned.md        ← K8s / cert-manager / Bitnami のハマりポイント集
+│   ├── single-instance-rwo-rollout-deadlock.md ← 単一インスタンス + RWO PVC + 内蔵 DB の rollout デッドロック (Gitea 経験から横展開)
 │   ├── backup-strategy.md             ← 多層バックアップの俯瞰 (vzdump / CronJob / Longhorn / Velero / etcd)
 │   ├── proxmox-zabbix-monitoring.md   ← Zabbix Phase 1-6 構築記録 + 運用知見
 │   ├── homelab-git-workflow.md        ← Git 運用ルール
