@@ -4,18 +4,18 @@
 # Target: RKE2 cluster, namespace `gitea`
 # Persistence: Longhorn RWO, 10Gi PVC `gitea-shared-storage`
 #
-# IMPORTANT: rollout strategy MUST remain `Recreate`.
-# Gitea embeds LevelDB queues under `/data/queues/common` on the RWO PVC.
-# Under RollingUpdate, the new pod tries to acquire the LevelDB lock while
-# the old pod is still alive, fails with
-#   "unable to lock level db ... resource temporarily unavailable"
-# and CrashLoopBackOff occurs, deadlocking the rollout.
-# Migrating database/queue/cache/session backends to PostgreSQL + Valkey
-# (see docs/rke2-workloads.md) would eliminate the constraint and allow
-# returning to RollingUpdate.
+# Backends (managed out-of-band, see gitea/k8s/ for the StatefulSet manifests):
+#   - database: PostgreSQL 17 on `gitea-postgres` (StatefulSet, 5Gi PVC)
+#   - cache / session / queue: Redis 7 on `gitea-redis` (StatefulSet, 1Gi PVC)
+#
+# Because the data/queue/cache/session backends now live outside the Gitea
+# pod, the rollout strategy is back to RollingUpdate. The LevelDB lock
+# deadlock that forced `Recreate` is no longer a constraint.
 strategy:
-  type: Recreate
-  rollingUpdate: null
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
 
 # admin section is intentionally empty so that the chart's init container
 # skips admin user creation/update logic. The existing admin user inside
@@ -32,17 +32,43 @@ gitea:
     server:
       DOMAIN: gitea.home.yagamin.net
       ROOT_URL: https://gitea.home.yagamin.net
+    # database / cache / session / queue connection strings that contain
+    # secret material are injected via additionalConfigFromEnvs below.
     database:
-      DB_TYPE: sqlite3
+      DB_TYPE: postgres
+      HOST: gitea-postgres:5432
+      NAME: gitea
+      USER: gitea
     cache:
-      ADAPTER: memory
+      ADAPTER: redis
     session:
-      PROVIDER: memory
+      PROVIDER: redis
     queue:
-      TYPE: level
+      TYPE: redis
     actions:
       ENABLED: true
       DEFAULT_ACTIONS_URL: github
+
+  # Inject secret-bearing settings via env. Gitea reads GITEA__section__KEY
+  # at startup and overlays them onto app.ini. Order matters: REDIS_PASSWORD
+  # must be defined before the $(REDIS_PASSWORD) references below.
+  additionalConfigFromEnvs:
+    - name: REDIS_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: gitea-redis
+          key: REDIS_PASSWORD
+    - name: GITEA__database__PASSWD
+      valueFrom:
+        secretKeyRef:
+          name: gitea-db
+          key: DB_PASSWORD
+    - name: GITEA__cache__HOST
+      value: "redis://:$(REDIS_PASSWORD)@gitea-redis:6379/0?pool_size=100&idle_timeout=180s"
+    - name: GITEA__session__PROVIDER_CONFIG
+      value: "redis://:$(REDIS_PASSWORD)@gitea-redis:6379/1?pool_size=100&idle_timeout=180s"
+    - name: GITEA__queue__CONN_STR
+      value: "redis://:$(REDIS_PASSWORD)@gitea-redis:6379/2?pool_size=100&idle_timeout=180s"
 
 ingress:
   enabled: true
@@ -71,8 +97,8 @@ resources:
   limits:
     memory: 512Mi
 
-# Subchart dependencies disabled. Gitea uses its own embedded SQLite and
-# in-process LevelDB / memory backends for now (see strategy note above).
+# Subchart-bundled stacks are not used. gitea-postgres / gitea-redis are
+# managed as independent StatefulSets under gitea/k8s/.
 postgresql:
   enabled: false
 postgresql-ha:

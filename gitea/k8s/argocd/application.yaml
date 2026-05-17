@@ -1,0 +1,47 @@
+---
+# ArgoCD Application for the gitea backend stack (gitea-postgres + gitea-redis).
+#
+# Source repo: homelab-infra on GitHub (Public).
+# We deliberately do NOT use the internal Gitea (gitea.home.yagamin.net) as
+# the source repo for this Application, because doing so would create a
+# circular dependency: ArgoCD would be unable to sync this stack while Gitea
+# itself is degraded (which is exactly when this stack would matter most).
+#
+# Application of this manifest itself is a one-time `kubectl apply` after the
+# parent PR merges to main. See gitea/README.md for the bootstrap procedure.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitea-infra
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shotayagami/homelab-infra.git
+    targetRevision: main
+    path: gitea/k8s/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitea
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind
