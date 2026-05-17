@@ -1,0 +1,14 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: gitea-redis
+  namespace: gitea
+spec:
+  encryptedData:
+    REDIS_PASSWORD: AgCMKO7qAw2FnAWgH3JMjTv40MTRsuedNkQ7wLlwFWVGPjkGVOHJRfpvHjQOd5Y+gOwoOh6wdKLmKPKfbIqg4idk4U5Z/31CqAlbfmcGfDa1Bxg3uoEd5zMXH12NH1eP0+DLD7cTSBLIUpG0zIuw70Mb5LeLEBdkEaA+UR1vCp7moEWmuzH9q8nweug0Wz16BwmwyZuIb7J42YNsxPurLafBgqlvNFM9L7rtVVtCLZZpclVE6zK9fK5acVtXM+eN2h1C6SOObtysuhmtPdpCyZL341EsbZ7bBPozT7pl259nitnQu+MJOEsyIfdRXL5taFIJjG5NkhX3IYmRUSXmA8gKERhbZZ7DrKdNFbGsM9sJ1DuC8KRS3z8kqT1ovcwifw8JxJo34k7NBAJo/ihkIOFDgxW348m4AWiX8E+u+pkXiVwfhpSO4XXF27Wd75ReZRqqA8teknG74T5XJwReUnM30lLe9IPqq4BWEiQrHcLaPdzpJNsUDZuFlW6itzApTZ0hAbWvqgPu6Bo55PiF+YsjTYMLyOwdo9amn8YsOouWIOFm/XFi/Za8NAtuqmiUGv2TfZ5NhdZyNlG3V66qgV+gV9j3IHi4cB8JDq8uxAwDdHatiSftQYvS7tTEEVg6x8fP6+z4Fc2y3L14OrvSjQlM/n/FJsTJ1Mvy3s4GbbBuHbvExoB8ET5odlx9PyM93Wank5/VDxC8xWlapypJh2To/ZJTa9eCnabgqzYWVlcYJNv0Z4a7UYb3vGZT9sck6/Q=
+  template:
+    metadata:
+      name: gitea-redis
+      namespace: gitea
+    type: Opaque
