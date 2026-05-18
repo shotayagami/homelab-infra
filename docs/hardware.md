@@ -77,11 +77,11 @@ i5-8500 は HT 非搭載のため物理 6 コア = 論理 6 スレッド。RKE2 
 
 | 項目 | バージョン |
 |---|---|
-| Proxmox VE | 9.1.11 (running 9.1.11/8eac2c86f015bdda) |
-| Kernel | Linux 6.17.13-8-pve (signed, Debian 13 ベース) |
+| Proxmox VE | 9.1.14 (running 9.1.14/7d542528ee1851f7、2026-05-19 apt upgrade) |
+| Kernel | Linux 7.0.2-4-pve (proxmox-kernel-7.0 系、signed, Debian 13 ベース) |
 | ストレージドライバ | LVM 2.03.31-2+pmx1、ZFS 2.4.2-pve1 (zfsutils インストール済だが未使用) |
 | Container | lxc-pve 7.0.0-1、lxcfs 7.0.0-pve1 |
-| KVM | pve-qemu-kvm 11.0.0-2、qemu-server 9.1.10 |
+| KVM | pve-qemu-kvm 11.0.0-2、qemu-server 9.1.12 |
 | クラスタ | corosync 3.1.10-pve2 インストール済 (シングルノードのため未参加) |
 | Ceph | 19.2.3-pve4 インストール済 (未使用) |
 | Backup | proxmox-backup-client 4.2.0-1 (`vzdump` で sdb に出力) |
