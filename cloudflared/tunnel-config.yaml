@@ -1,0 +1,63 @@
+# Source-of-truth for the Cloudflare Tunnel "home-yagamin"
+# (UUID 8b20116a-8d95-4f00-8edc-f50a647451c7).
+#
+# The tunnel is configured as remotely-managed in Cloudflare's Zero Trust
+# dashboard, so this file is pushed to the CF API by
+#   scripts/cloudflared-push-tunnel-config.sh
+# which performs an idempotent PUT of /accounts/{aid}/cfd_tunnel/{tid}/configurations.
+#
+# DNS CNAME records must be created separately (see scripts/cloudflared-ensure-dns.sh).
+ingress:
+  # --- Puter (served by LXC 102 nginx at 192.168.11.151:80) ---
+  # Use the LAN IP (not 127.0.0.1) because this same tunnel is also served by
+  # the in-cluster cloudflared Deployment. Cloudflare distributes requests
+  # across all connectors on the tunnel; `127.0.0.1` from a Pod would loop
+  # back to the connector itself and 502. The LAN IP is reachable from
+  # either connector (LXC 102 and RKE2 Pods).
+  - hostname: puter.yagamin.net
+    service: http://192.168.11.151:80
+  - hostname: api.yagamin.net
+    service: http://192.168.11.151:80
+  - hostname: site.yagamin.net
+    service: http://192.168.11.151:80
+  - hostname: host.yagamin.net
+    service: http://192.168.11.151:80
+  - hostname: app.yagamin.net
+    service: http://192.168.11.151:80
+  - hostname: dev.yagamin.net
+    service: http://192.168.11.151:80
+
+  # --- Dev preview hosts (RKE2 ingress-nginx on cp1) ---
+  # Host header is NOT rewritten; the ingress rule matches `dev-*.yagamin.net`
+  # directly. The `X-Robots-Tag: noindex` header is added by the ingress
+  # server-snippet to keep these hosts out of search engines.
+  - hostname: dev-dealmatch.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: dev-seller-dealmatch.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: dev-buyer-dealmatch.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: dev-pairs.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: dev-mensbar.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: dev-lilies.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+
+  # --- Catch-all (must be the last entry) ---
+  - service: http_status:404
+
+warp-routing:
+  enabled: false

@@ -1,0 +1,46 @@
+---
+# ArgoCD Application for the in-cluster cloudflared tunnel.
+#
+# Source repo: homelab-infra on GitHub (Public). We deliberately do NOT use
+# the internal Gitea as the source, because cloudflared is on the path that
+# exposes Gitea itself; a circular dependency would prevent recovery when
+# Gitea is degraded.
+#
+# Bootstrap: after the parent PR merges to main, run once
+#   kubectl apply -f cloudflared/k8s/argocd/application.yaml
+#
+# The existing manually-applied resources (Deployment / ConfigMap / Secret in
+# the `cloudflare` namespace) will be adopted on first sync. Verify that the
+# tunnel UUID baked into base/configmap.yaml matches the live tunnel before
+# enabling automated sync, otherwise selfHeal would replace credentials with
+# stale data.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudflared
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shotayagami/homelab-infra.git
+    targetRevision: main
+    path: cloudflared/k8s/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cloudflare
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m

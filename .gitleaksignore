@@ -10,3 +10,4 @@
 # generic-api-key (高 entropy base64) 検出は誤検出となる。
 gitea/k8s/overlays/production/sealed-secrets/gitea-redis.yaml:generic-api-key:9
 gitea/k8s/overlays/production/sealed-secrets/gitea-db.yaml:generic-api-key:10
+cloudflared/k8s/overlays/production/sealed-secrets/tunnel-credentials.yaml:generic-api-key:9
