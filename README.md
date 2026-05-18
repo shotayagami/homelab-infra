@@ -14,7 +14,7 @@
 | 追加 SSD B | Fanxiang S101Q 1 TB SATA QLC — `store-sdb` (バックアップ専用) |
 | USB HDD ×4 | WDC 8/4 TB + Seagate 3/2 TB (計 ~15.6 TiB) — **OpenMediaVault VM (VMID 100) に disk passthrough**、PVE 側ではマウントしない |
 | NIC | Intel I219-LM オンボード 1 GbE → `vmbr0` 192.168.11.11/24 |
-| Hypervisor | Proxmox VE 9.1.11 / Kernel 6.17.13-8-pve |
+| Hypervisor | Proxmox VE 9.1.14 / Kernel 7.0.2-4-pve (proxmox-kernel-7.0、2026-05-19 apt upgrade) |
 
 詳細・storage tier の決定経緯・拡張余地は [docs/hardware.md](docs/hardware.md) を参照。
 
