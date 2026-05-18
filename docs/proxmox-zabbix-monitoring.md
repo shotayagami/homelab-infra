@@ -186,7 +186,10 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
   - **dns2 では同じ手順で再現しても "TLS certificate file does not exists" が出続け、File.Exists() が false を返す**（config 完全同一、PFX 存在＋読み取り可、AppArmor 無し、symlink も配置済み、原因不明）
 - **Phase 4-A 部分撤退（業務時間優先）**: dns2 の DoT 853 / DoH 443 監視アイテム・トリガーを無効化。dns2 は通常 DNS (53) と Web UI (5380) のみ監視。dns は DoT/DoH も含めて完全監視。
 - **dns2 の DoT/DoH 問題は宿題化**: 後日 Technitium 15.x のバグ報告確認、または別実装（CoreDNS, PowerDNS）への移行検討。
-- **2026-05-19 dns2 DoT/DoH 復旧完了**: 根本原因は Technitium 自体ではなく `/etc/dns/dns.config` バイナリの **cert path フィールド末尾に literal タブ (0x09) が混入** していた点 (`\x00\x0fcerts/dns2.pfx\t` で length=15 + tab 含む 15 文字)。`File.Exists("/etc/dns/certs/dns2.pfx\t")` が false 返却するため cert load 失敗 → TLS bind skip。Technitium 15.x の Web UI で cert path を入力した際の trim 漏れ後遺症と推測。binary patch (`\x00\x0e` + tab 除去、計 1 byte 減) で復旧、TLSv1.3 handshake と DoH `/dns-query` HTTP 200 を確認。Zabbix item 51661/51662 + trigger 25589/25590 を `status=0` に再有効化、value=1 (up) を継続取得中。詳細は [internal-dns.md §6](internal-dns.md#6-dns2-の-dotdoh-2026-05-19-復旧)。webservice.config 側にも同種のバグが残存 (両ノード共 admin UI HTTPS 53443 非稼働) だが、5380 HTTP 運用で実害なし。
+- **2026-05-19 dns2 DoT/DoH + 両ノード admin UI HTTPS (53443) 一括復旧**: 根本原因は Technitium 自体ではなく **バイナリ config 中の cert path フィールド末尾に literal タブ (0x09) が混入** していた点 (例: dns2 で `\x00\x0fcerts/dns2.pfx\t` で length=15 + tab 含む 15 文字)。`File.Exists("...pfx\t")` が false 返却するため cert load 失敗 → TLS bind skip。Technitium 15.x の Web UI で cert path を入力した際の trim 漏れ後遺症と推測。
+  - `/etc/dns/dns.config` (DoT/DoH 用): dns2 のみ被害、binary patch (1 byte 減) で復旧、TLSv1.3 handshake と DoH `/dns-query` HTTP 200 を確認、Zabbix item 51661/51662 + trigger 25589/25590 を `status=0` に再有効化
+  - `/etc/dns/webservice.config` (admin UI HTTPS 用): 両ノードに同種の trailing-tab + さらに **password フィールドが空** という二重バグあり。cert path 修正に加えて空 password を 24 byte 注入する必要があった (`CryptographicException: ... password may be incorrect` 経由で判明)。両ノードで `[::]:53443` HTTPS bind 成功、`curl -sk https://...:53443/` で HTTP 200 確認
+  - 詳細は [internal-dns.md §6](internal-dns.md#6-dns2-の-dotdoh-2026-05-19-復旧)
 - **Phase 4-A クローズ**、4-B (Nextcloud) と 4-C (step-ca) は別アプローチなので次フェーズで進める。
 - **Phase 4-C (step-ca) 完了**: テンプレ `Smallstep step-ca by HTTP` を API で作成、step-ca ホストに適用。
   - `stepca.health` (HTTP agent → JSONPath で `status` 抽出 → JS で 1/0 化)
