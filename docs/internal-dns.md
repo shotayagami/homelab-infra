@@ -65,13 +65,52 @@ NIC 側に `firewall=1` を付けて初めて per-CT firewall が有効化され
 
 詳細経緯は [proxmox-firewall.md](proxmox-firewall.md) §6 参照。
 
-## 6. dns2 の DoT/DoH 未復旧 (既知の課題)
+## 6. dns2 の DoT/DoH (2026-05-19 復旧)
 
-dns2 (LXC 105) の DoT/DoH は **Technitium 15.x の cert load 周りの不具合** で動作していない。Zabbix 側の DoT/DoH 監視アイテムは disable で対応中 (Issue #3、[docs/remaining-tasks.md](remaining-tasks.md) 参照)。
+dns2 (LXC 105) の DoT 853 / DoH 443 は長期間停止していたが、2026-05-19 に **dns.config バイナリの cert path フィールド末尾に literal タブ文字 (0x09) が混入** していたことが根本原因と判明し、binary patch で復旧した。
 
-- DNS (53) と Web UI は正常稼働
-- Primary 側 (dns) の DoT/DoH は正常稼働しているため、外部公開していない LAN 用途では実害なし
-- Technitium のバージョン据置 (15.x) と、上流の修正待ち、または別 DNS 実装 (Unbound + nsd 等) への移行が選択肢
+### 症状
+起動時ログに以下が出続け、`/etc/dns/certs/dns2.pfx` が確かに存在するにも関わらず Technitium が `File.Exists` で false を返していた:
+
+```
+DNS Server encountered an error while loading DNS Server TLS certificate: /etc/dns/certs/dns2.pfx
+System.ArgumentException: DNS Server TLS certificate file does not exists: /etc/dns/certs/dns2.pfx
+```
+
+結果、`853` (DoT) と `443` (DoH) の bind がスキップされ、`5380` (HTTP) と `53` (DNS) のみで稼働していた。
+
+### 根本原因
+`/etc/dns/dns.config` の cert path フィールド (Technitium 独自バイナリ形式、長さプレフィックス + 文字列) が:
+- 期待値: `\x00\x0e certs/dns2.pfx` (length=14 + 14 chars)
+- 実値: `\x00\x0f certs/dns2.pfx\t` (length=15 + 14 chars + literal タブ)
+
+.NET の `BinaryReader.ReadString` が 15 バイト読み取って `"certs/dns2.pfx\t"` を path として保持 → `File.Exists` 失敗。Technitium 15.x の Web UI で cert path を入力した際の trim 漏れバグの後遺症と推測。
+
+### 修正手順
+```bash
+# dns2 LXC 内で実施
+systemctl stop dns
+cp /etc/dns/dns.config /etc/dns/dns.config.bak.$(date +%Y%m%d-%H%M%S)
+
+python3 <<'PY'
+with open("/etc/dns/dns.config", "rb") as f: data = f.read()
+needle = b"\x00\x0fcerts/dns2.pfx\t"           # length=15, tab 付き
+fix    = b"\x00\x0ecerts/dns2.pfx"             # length=14, tab なし
+data = data.replace(needle, fix, 1)
+with open("/etc/dns/dns.config", "wb") as f: f.write(data)
+PY
+
+systemctl start dns
+```
+
+### 復旧確認
+- `ss -tln`: `0.0.0.0:853` / `:443` / `:53` / `:5380` 全て LISTEN
+- `openssl s_client -connect 192.168.11.54:853 -servername dns2.home.yagamin.net`: TLSv1.3 handshake 成功
+- DoH curl: `https://dns2.home.yagamin.net/dns-query?dns=...` で `HTTP 200` と DNS message を取得
+- Zabbix item 51661 (`DoT TCP/853`) / 51662 (`DoH HTTPS/443`) と trigger 25589/25590 を `status=0` (enabled) に戻し、value=1 (up) を継続取得
+
+### 残課題
+`/etc/dns/webservice.config` 側にも同種の trailing-tab バグがあり、両ノードで Web admin UI HTTPS (`53443`) が bind しない。`5380` HTTP で運用しているため触っていないが、HTTPS 化したい場合は同手法で patch 可能。
 
 ## 7. クライアント設定の確認
 

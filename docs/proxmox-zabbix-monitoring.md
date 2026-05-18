@@ -186,6 +186,7 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
   - **dns2 では同じ手順で再現しても "TLS certificate file does not exists" が出続け、File.Exists() が false を返す**（config 完全同一、PFX 存在＋読み取り可、AppArmor 無し、symlink も配置済み、原因不明）
 - **Phase 4-A 部分撤退（業務時間優先）**: dns2 の DoT 853 / DoH 443 監視アイテム・トリガーを無効化。dns2 は通常 DNS (53) と Web UI (5380) のみ監視。dns は DoT/DoH も含めて完全監視。
 - **dns2 の DoT/DoH 問題は宿題化**: 後日 Technitium 15.x のバグ報告確認、または別実装（CoreDNS, PowerDNS）への移行検討。
+- **2026-05-19 dns2 DoT/DoH 復旧完了**: 根本原因は Technitium 自体ではなく `/etc/dns/dns.config` バイナリの **cert path フィールド末尾に literal タブ (0x09) が混入** していた点 (`\x00\x0fcerts/dns2.pfx\t` で length=15 + tab 含む 15 文字)。`File.Exists("/etc/dns/certs/dns2.pfx\t")` が false 返却するため cert load 失敗 → TLS bind skip。Technitium 15.x の Web UI で cert path を入力した際の trim 漏れ後遺症と推測。binary patch (`\x00\x0e` + tab 除去、計 1 byte 減) で復旧、TLSv1.3 handshake と DoH `/dns-query` HTTP 200 を確認。Zabbix item 51661/51662 + trigger 25589/25590 を `status=0` に再有効化、value=1 (up) を継続取得中。詳細は [internal-dns.md §6](internal-dns.md#6-dns2-の-dotdoh-2026-05-19-復旧)。webservice.config 側にも同種のバグが残存 (両ノード共 admin UI HTTPS 53443 非稼働) だが、5380 HTTP 運用で実害なし。
 - **Phase 4-A クローズ**、4-B (Nextcloud) と 4-C (step-ca) は別アプローチなので次フェーズで進める。
 - **Phase 4-C (step-ca) 完了**: テンプレ `Smallstep step-ca by HTTP` を API で作成、step-ca ホストに適用。
   - `stepca.health` (HTTP agent → JSONPath で `status` 抽出 → JS で 1/0 化)
@@ -276,7 +277,7 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 | 2 | PVE テンプレで `<SET PVE HOST>` プレースホルダ忘れ | `{$PVE.URL.HOST}` 必須、継承マクロタブで `<SET ...>` 残存チェック |
 | 3 | systemd 255 警告でハマり | LXC `features=nesting=1` を Ubuntu 24.04 で付与 |
 | 3 | agent install 後の auto-start が前 config で動く | **install → conf 変更 → restart** をワンセットに |
-| 4-A | Technitium DoT/DoH cert 設定で BadImageFormatException | 業務的判断で dns2 撤退、宿題化 |
+| 4-A | Technitium DoT/DoH cert 設定で BadImageFormatException | 業務的判断で dns2 撤退、宿題化 → **2026-05-19 復旧**: dns.config バイナリの cert path に literal タブ混入が真因 ([internal-dns.md §6](internal-dns.md#6-dns2-の-dotdoh-2026-05-19-復旧)) |
 | 5-A | ntfy 内部 HTTPS で `{$ZABBIX.URL}` 未定義エラー | グローバルマクロ事前定義 |
 | 5-B | Discord 組込テンプレを我々が parameters 上書きして壊した | **既存テンプレを使う場合は parameters いじらない**、必要なら別名で新規作成 |
 | 5-D | `mediatype.test` が Zabbix 7.0 API に存在しない | UI のテストボタン使用、または実 trigger で確認 |
@@ -297,7 +298,7 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 - [ ] PVE firewall 再有効化検討（現状 enable: 0）
 - [x] ~~Phase 4-B: Nextcloud 監視~~ → 2026-05-15 完了 (§8.2 参照)
 - [x] ~~Phase 4-D: RKE2 クラスタ監視~~ → 2026-05-16 完了 (§8.5 参照)
-- [ ] dns2 の DoT/DoH 再有効化検討（Technitium 15.x の挙動次第）
+- [x] ~~dns2 の DoT/DoH 再有効化検討（Technitium 15.x の挙動次第）~~ → **2026-05-19 復旧完了** ([internal-dns.md §6](internal-dns.md#6-dns2-の-dotdoh-2026-05-19-復旧))
 
 ### 参考リンク
 
