@@ -30,7 +30,7 @@
 | step-ca | 107 | LXC | 192.168.11.61 | 内部 PKI (smallstep) |
 | nextcloud | 108 | LXC | 192.168.11.62 | ファイル共有 + Office |
 | pg-db | 106 | LXC | 192.168.11.60 | アプリ用 PostgreSQL 17 (RKE2 上の Django アプリの外部 DB) |
-| puter | 102 | LXC | (停止中) | セルフホスト Internet OS |
+| puter | 102 | LXC | 192.168.11.174 | セルフホスト Internet OS (Docker Compose、CF Tunnel で `puter.yagamin.net` 他公開) |
 | k8s-cp1 (RKE2 control plane) | 110 | VM | 192.168.11.80 | RKE2 v1.34.3、ArgoCD/Harbor/Gitea/Longhorn 等を載せる検証クラスタ |
 | k8s-worker1 (RKE2 worker) | 120 | VM | 192.168.11.83 | Longhorn replica ホスト (`store-sda` 上) |
 | admin-vm | 150 | VM | (PVE 経由 SSH) | 運用クライアント、`/usr/local/bin` に `pct/qm/pvesh/pveum` SSH ラッパー設置済 |
