@@ -68,7 +68,7 @@ set -o history
 
 | # | 内容 | 出所 | 備考 |
 |---|---|---|---|
-| 14 | [Issue #3](https://github.com/shotayagami/homelab-infra/issues/3) dns2 DoT/DoH 再有効化 | GitHub + チェックリスト #8 | Technitium 15.x の cert load 異常 (`BadImageFormatException`) 待ち。代替実装 (CoreDNS / PowerDNS) 移行も選択肢 |
+| 14 | ~~[Issue #3](https://github.com/shotayagami/homelab-infra/issues/3) dns2 DoT/DoH 再有効化~~ | GitHub + チェックリスト #8 | **2026-05-19 完了** ([internal-dns.md §6](internal-dns.md#6-dns2-の-dotdoh-2026-05-19-復旧))。真因は Technitium バグではなく `dns.config` バイナリの cert path 末尾に literal タブ混入で `File.Exists` が false 返却していたこと。binary patch (1 byte 削除) で復旧、Zabbix item/trigger も再有効化済 |
 
 ---
 
