@@ -47,7 +47,7 @@ cloudflared/
 | `dev-mensbar.yagamin.net` | crossing (mensbar) |
 | `dev-lilies.yagamin.net` | crossing (lilies) |
 
-すべて `https://192.168.11.80:443` (cp1 上の rke2 ingress-nginx) に `noTLSVerify: true` で繋ぐ。Host ヘッダは書き換えず、ingress 側で `dev-*.yagamin.net` を直接受ける。`dev-*` は **一般公開せず** 関係者限定。検索エンジン除外は ingress server-snippet で `X-Robots-Tag: noindex, nofollow` を付与、アプリ側でも `/robots.txt` で `Disallow: /` を返す二重防御。
+すべて `https://192.168.11.80:443` (cp1 上の rke2 ingress-nginx) に `noTLSVerify: true` で繋ぐ。Host ヘッダは書き換えず、ingress 側で `dev-*.yagamin.net` を直接受ける。`dev-*` は **一般公開せず** 関係者限定。検索エンジン除外は ingress-nginx の `server-snippet` annotation が cluster admission webhook で拒否される (`allow-snippet-annotations: false`、CVE-2024-7646 緩和) ため、アプリ側 Django middleware で `X-Robots-Tag: noindex, nofollow, noarchive` を付与、加えて `/robots.txt` で `Disallow: /` を返す二重防御。
 
 ## 運用手順
 
