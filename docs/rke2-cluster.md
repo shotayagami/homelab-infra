@@ -123,7 +123,7 @@ KSM 強化 + worker1 swap 投入の詳細は [docs/proxmox-zabbix-monitoring.md]
 | worker1 (120) | 3c / 7 GiB | 3c / **9 GiB** |
 | **合計** | 7c / 16 GiB | **7c / 20 GiB** |
 
-cores は据置。`qm config 110/120` で `memory: 11264 / 9216` 確認可。cp1 に etcd リスクがあるため swap は依然入れず、worker1 のみ swap (32 GiB, fail-swap-on=false)。memory hotplug は 2026-05-17 に全 VM へ `hotplug: network,disk,usb,memory,cpu` + `numa: 1` を投入済 (一度コールド再起動した VM のみ有効)、次回以降は `qm set -memory N` でオンライン増加可能。
+cores は据置。`qm config 110/120` で `memory: 11264 / 9216` 確認可。cp1 に etcd リスクがあるため swap は依然入れず、worker1 のみ swap (32 GiB, fail-swap-on=false)。memory hotplug は 2026-05-17 に全 VM へ `hotplug: network,disk,usb,memory,cpu` + `numa: 1` を投入済 (一度コールド再起動した VM のみ有効)、次回以降は `qm set 110 --memory <MiB>` / `qm set 120 --memory <MiB>` でオンライン増加可能。
 
 ### Phase 1: DB レプリカ削減
 
