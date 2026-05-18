@@ -253,10 +253,11 @@ Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を
 |---|---|---|---|---|
 | Zabbix Server + Web + DB | 190 | LXC | 192.168.11.55 | Zabbix 7.0 LTS + nginx + PostgreSQL 16, Ubuntu 24.04 |
 | ntfy notification server | 191 | LXC | 192.168.11.56 | ntfy 2.22.0, HTTPS (step-ca cert), CF tunnel 公開 `ntfy.yagamin.net` |
-| 監視対象 (Linux agent, LXC) | 104,105,107,108,190 | LXC | (各 IP) | DNS, step-ca, Nextcloud, Zabbix self |
-| 監視対象 (Linux agent, VM) | 110, 120 | VM | 192.168.11.80, .83 | RKE2 control plane / worker (Phase 4-D 追加) |
+| 監視対象 (Linux agent, LXC) | 104, 105, 106, 107, 108, 190 | LXC | (各 IP) | dns, dns2, pg-db (2026-05-16 追加), step-ca, nextcloud, Zabbix self |
+| 監視対象 (Linux agent, VM) | 100, 110, 120 | VM | (各 IP) | openmediaVault (2026-05-18 Phase 1 追加), k8s-cp1, k8s-worker1 (Phase 4-D 追加) |
 | 監視対象 (HTTP API: PVE) | — | host | 192.168.11.11 | `Proxmox VE by HTTP` テンプレ, monitoring@pve!ztoken |
 | 監視対象 (HTTP API: k8s) | `k8s-cluster` (10692) | virtual | https://192.168.11.80:6443 | `Kubernetes cluster state by HTTP` テンプレ、ServiceAccount + permanent token、3397 items |
+| 監視対象外 | 102, 150, 191 | LXC/VM | — | puter / admin-vm / ntfy は Zabbix host 未登録 (PVE LLD の discovered items のみ)。mail (101) は stopped |
 
 ### 通知経路
 
