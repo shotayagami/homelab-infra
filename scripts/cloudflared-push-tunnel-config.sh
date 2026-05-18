@@ -34,6 +34,16 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
+# PyYAML is required to parse tunnel-config.yaml. Fail early with an install
+# hint if it's missing rather than letting the python heredoc spit
+# `ModuleNotFoundError` in the middle of the run.
+if ! python3 -c 'import yaml' 2>/dev/null; then
+  echo "ERROR: PyYAML is required (python3 -c 'import yaml' failed)." >&2
+  echo "  apt-based: sudo apt install python3-yaml" >&2
+  echo "  pip:       python3 -m pip install --user pyyaml" >&2
+  exit 1
+fi
+
 # Convert YAML -> JSON via python (avoid yq dep)
 DESIRED=$(python3 - <<PY
 import json, yaml, sys
@@ -43,9 +53,17 @@ print(json.dumps(data, separators=(",", ":")))
 PY
 )
 
-LIVE=$(curl -sS -H "Authorization: Bearer $CF_API_TOKEN" \
-  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${CF_TUNNEL_ID}/configurations" \
-  | jq -c '.result.config // {}')
+LIVE_RAW=$(curl -sS -H "Authorization: Bearer $CF_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${CF_TUNNEL_ID}/configurations")
+
+LIVE_OK=$(echo "$LIVE_RAW" | jq -r '.success // false')
+if [[ "$LIVE_OK" != "true" ]]; then
+  echo "FAIL: GET tunnel configurations did not return success=true." >&2
+  echo "$LIVE_RAW" | jq . >&2 2>/dev/null || echo "$LIVE_RAW" >&2
+  exit 1
+fi
+
+LIVE=$(echo "$LIVE_RAW" | jq -c '.result.config // {}')
 
 # Normalize both sides for comparison (sorted keys, drop nulls)
 DESIRED_NORM=$(echo "$DESIRED" | jq -S -c 'del(.. | nulls?)')

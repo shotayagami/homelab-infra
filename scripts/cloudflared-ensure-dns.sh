@@ -58,6 +58,16 @@ api() {
 
 for host in "${HOSTS[@]}"; do
   existing=$(api GET "/zones/${CF_ZONE_ID}/dns_records?type=CNAME&name=${host}")
+  # Don't conflate "auth/zone error" with "no record exists". A GET that
+  # doesn't return success=true would otherwise have `.result | length == 0`
+  # and the script would happily POST a duplicate record (or fail loudly
+  # only in real exec mode), masking misconfiguration.
+  existing_ok=$(echo "$existing" | jq -r '.success // false')
+  if [[ "$existing_ok" != "true" ]]; then
+    echo "FAIL: GET dns_records for $host did not return success=true." >&2
+    echo "$existing" | jq . >&2 2>/dev/null || echo "$existing" >&2
+    exit 1
+  fi
   count=$(echo "$existing" | jq -r '.result | length')
   desired_body=$(jq -nc \
     --arg name "$host" \

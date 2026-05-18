@@ -8,19 +8,24 @@
 #
 # DNS CNAME records must be created separately (see scripts/cloudflared-ensure-dns.sh).
 ingress:
-  # --- Puter (served by LXC 102 local nginx at 127.0.0.1:80) ---
+  # --- Puter (served by LXC 102 nginx at 192.168.11.151:80) ---
+  # Use the LAN IP (not 127.0.0.1) because this same tunnel is also served by
+  # the in-cluster cloudflared Deployment. Cloudflare distributes requests
+  # across all connectors on the tunnel; `127.0.0.1` from a Pod would loop
+  # back to the connector itself and 502. The LAN IP is reachable from
+  # either connector (LXC 102 and RKE2 Pods).
   - hostname: puter.yagamin.net
-    service: http://127.0.0.1:80
+    service: http://192.168.11.151:80
   - hostname: api.yagamin.net
-    service: http://127.0.0.1:80
+    service: http://192.168.11.151:80
   - hostname: site.yagamin.net
-    service: http://127.0.0.1:80
+    service: http://192.168.11.151:80
   - hostname: host.yagamin.net
-    service: http://127.0.0.1:80
+    service: http://192.168.11.151:80
   - hostname: app.yagamin.net
-    service: http://127.0.0.1:80
+    service: http://192.168.11.151:80
   - hostname: dev.yagamin.net
-    service: http://127.0.0.1:80
+    service: http://192.168.11.151:80
 
   # --- Dev preview hosts (RKE2 ingress-nginx on cp1) ---
   # Host header is NOT rewritten; the ingress rule matches `dev-*.yagamin.net`
