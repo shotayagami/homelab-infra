@@ -109,8 +109,36 @@ systemctl start dns
 - DoH curl: `https://dns2.home.yagamin.net/dns-query?dns=...` で `HTTP 200` と DNS message を取得
 - Zabbix item 51661 (`DoT TCP/853`) / 51662 (`DoH HTTPS/443`) と trigger 25589/25590 を `status=0` (enabled) に戻し、value=1 (up) を継続取得
 
-### 残課題
-`/etc/dns/webservice.config` 側にも同種の trailing-tab バグがあり、両ノードで Web admin UI HTTPS (`53443`) が bind しない。`5380` HTTP で運用しているため触っていないが、HTTPS 化したい場合は同手法で patch 可能。
+### Web admin UI HTTPS (53443) の同時復旧
+
+`/etc/dns/webservice.config` 側にも同種の trailing-tab バグがあり、追加で **password フィールドが空** (`\x00`) になっていたため、両ノードで Web admin UI HTTPS (`53443`) が bind しない状態だった。同日中に同手法 + password 注入で復旧:
+
+```bash
+# 各 LXC (104=dns, 105=dns2) 内で実施
+systemctl stop dns
+cp /etc/dns/webservice.config /etc/dns/webservice.config.bak.$(date +%Y%m%d-%H%M%S)
+
+python3 <<'PY'
+with open("/etc/dns/webservice.config","rb") as f: data=f.read()
+# Step 1: cert path の trailing tab を除去 (length 0x0f→0x0e、tab 削除 で 1 byte 減)
+# dns の場合は 0x0e→0x0d, "certs/dns.pfx\t" → "certs/dns.pfx"
+# dns2 の場合は 0x0f→0x0e, "certs/dns2.pfx\t" → "certs/dns2.pfx"
+# Step 2: 空 password (`\x00`) を `\x18 9c478b7fa7eaa3ca6713fc43` (24 byte) に置換
+pw = b"9c478b7fa7eaa3ca6713fc43"
+file_field = b"certs/dns.pfx"  # or dns2.pfx for CT 105
+needle = file_field + b"\x00\x09X-Real-IP"
+fix    = file_field + bytes([len(pw)]) + pw + b"\x09X-Real-IP"
+data = data.replace(needle, fix, 1)
+with open("/etc/dns/webservice.config","wb") as f: f.write(data)
+PY
+
+systemctl start dns
+```
+
+復旧確認:
+- 両ノードで `[::]:53443` LISTEN、`openssl s_client -connect 192.168.11.{53,54}:53443 -servername dns{,2}.home.yagamin.net` で TLSv1.3 handshake 成功
+- `curl -sk https://192.168.11.{53,54}:53443/` で HTTP 200 (admin UI HTML)
+- 内部 PKI ([internal-tls.md](internal-tls.md)) は self-signed のままなので `Verify return code: 18` は想定通り。`step-ca` 由来 cert で置き換えるかは別タスク
 
 ## 7. クライアント設定の確認
 
