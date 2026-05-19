@@ -33,7 +33,7 @@
 | puter | 102 | LXC | 192.168.11.174 | セルフホスト Internet OS (Docker Compose、CF Tunnel で `puter.yagamin.net` 他公開) |
 | k8s-cp1 (RKE2 control plane) | 110 | VM | 192.168.11.80 | RKE2 v1.34.3、ArgoCD/Harbor/Gitea/Longhorn 等を載せる検証クラスタ |
 | k8s-worker1 (RKE2 worker) | 120 | VM | 192.168.11.83 | Longhorn replica ホスト (`store-sda` 上) |
-| admin-vm | 150 | VM | (PVE 経由 SSH) | 運用クライアント、`/usr/local/bin` に `pct/qm/pvesh/pveum` SSH ラッパー設置済 |
+| admin-vm | 150 | VM | 192.168.11.10 | 運用クライアント、`/usr/local/bin` に `pct/qm/pvesh/pveum` SSH ラッパー設置済、Zabbix 監視 (hostid=10704、2026-05-19 追加) |
 
 ## ディレクトリ構成
 
