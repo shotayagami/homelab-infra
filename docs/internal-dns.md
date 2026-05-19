@@ -140,7 +140,52 @@ systemctl start dns
 - `curl -sk https://192.168.11.{53,54}:53443/` で HTTP 200 (admin UI HTML)
 - 内部 PKI ([internal-tls.md](internal-tls.md)) は self-signed のままなので `Verify return code: 18` は想定通り。`step-ca` 由来 cert で置き換えるかは別タスク
 
-## 7. クライアント設定の確認
+## 7. step-ca 由来 cert への置き換え (2026-05-19)
+
+復旧直後の cert は手動 self-signed (CN=dns/dns2.home.yagamin.net、`Verify return code: 18`) だったため、同日中に内部 PKI ([internal-tls.md](internal-tls.md)) の step-ca 発行証明書に置き換えた。
+
+### 初回発行
+
+ACME http-01 は私設 IP 到達性の関係で使わず、**JWK provisioner `admin` で直接発行**する (step CLI は LXC 104/105 で bootstrap 済、root CA fingerprint + ca-url=`https://192.168.11.61` 登録済)。
+
+```bash
+# 各 LXC (104=dns, 105=dns2) 内で実施。HOST と IP を該当ノードに差し替え
+HOST=dns        # or dns2
+IP=192.168.11.53  # or .54
+
+mkdir -p /etc/ssl/step && chmod 700 /etc/ssl/step
+echo "<JWK admin password>" > /tmp/step.pass && chmod 600 /tmp/step.pass
+
+step ca certificate "${HOST}.home.yagamin.net" \
+  --san "${HOST}.home.yagamin.net" --san "$HOST" --san "$IP" \
+  --provisioner admin --provisioner-password-file /tmp/step.pass \
+  --ca-url https://192.168.11.61 \
+  "/etc/ssl/step/${HOST}.crt" "/etc/ssl/step/${HOST}.key"
+rm -f /tmp/step.pass
+
+# Technitium が要求する PFX に再パッケージ (既存の dns.config 内 password を流用)
+PASS=$(grep -oP '(?<=DNS_CERT_PASSWORD=).+' /root/.dns-cert-password)
+openssl pkcs12 -export -out "/etc/dns/certs/${HOST}.pfx.new" \
+  -inkey "/etc/ssl/step/${HOST}.key" -in "/etc/ssl/step/${HOST}.crt" \
+  -name "${HOST}.home.yagamin.net" -passout "pass:$PASS"
+
+cp "/etc/dns/certs/${HOST}.pfx" "/etc/dns/certs/${HOST}.pfx.bak.selfsigned-$(date +%Y%m%d-%H%M%S)"
+mv "/etc/dns/certs/${HOST}.pfx.new" "/etc/dns/certs/${HOST}.pfx"
+chmod 600 "/etc/dns/certs/${HOST}.pfx"
+systemctl restart dns
+```
+
+確認: `openssl s_client -connect 127.0.0.1:853 -servername dns.home.yagamin.net` で `issuer=O = Home Lab CA, CN = Home Lab CA Intermediate CA` + **`Verify return code: 0 (ok)`**。
+
+### 自動更新 (step-renew-dns.service)
+
+step-ca cert は 7 日有効。`step ca renew --daemon --expires-in 120h` で残り 120h を切ったタイミングで自動更新するパターンを採用 (nextcloud と同型、[internal-tls.md](internal-tls.md))。PEM→PFX 変換 + `dns.service` 再起動は exec フック [`scripts/lxc-dns/dns-cert-renew-hook.sh`](../scripts/lxc-dns/dns-cert-renew-hook.sh) が担当 (hook 内で `hostname` を見て dns / dns2 を自動分岐するので両ノード共通スクリプト)。systemd unit は [`scripts/systemd-units/step-renew-dns.service`](../scripts/systemd-units/step-renew-dns.service) (dns2 では `ExecStart` の cert/key path を `dns2.*` に差し替え)。
+
+deploy 後:
+- `systemctl is-active step-renew-dns.service` = `active`
+- 初回 renewal までの所要時間は `journalctl -u step-renew-dns | grep "first renewal"` で確認可 (実測 40-42h、cert 残期間 7d - threshold 5d ≈ 2d 後にトリガー)
+
+## 8. クライアント設定の確認
 
 DHCP で配布される DNS 設定をクライアント側で確認:
 

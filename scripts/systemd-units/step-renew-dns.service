@@ -1,0 +1,20 @@
+[Unit]
+Description=step-ca certificate renewer for Technitium DNS
+Documentation=https://smallstep.com/docs/step-cli/reference/ca/renew/
+After=network-online.target dns.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=STEPPATH=/root/.step
+# CT 105 (dns2) では cert/key のパスを /etc/ssl/step/dns2.* に差し替えること
+ExecStart=/usr/bin/step ca renew --daemon --expires-in 120h \
+  --exec "/usr/local/bin/dns-cert-renew-hook.sh" \
+  /etc/ssl/step/dns.crt /etc/ssl/step/dns.key
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

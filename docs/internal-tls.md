@@ -104,7 +104,8 @@ Zabbix 構築時に CN だけで発行 → TLS verify 失敗 → 再発行で解
 |---|---|---|---|---|
 | Nextcloud | 108 | `nextcloud.home.yagamin.net` | `step-renew-nextcloud.service` | 2026-04 初頭 |
 | Zabbix Web UI | 190 | `zabbix.home.yagamin.net` | `step-renew-zabbix.service` | 2026-05-15 (Issue #8) |
-| Technitium DoT/DoH (dns) | 104 | DNS の 853/443 | Technitium 内部で renew | (Primary のみ稼働) |
+| pg-db PostgreSQL SSL | 106 | `pg-db.home.yagamin.net` (IP=.60) | cron `/etc/cron.d/step-ca-renew` | 2026-05-16 |
+| Technitium DNS (dns/dns2) | 104 / 105 | `dns/dns2.home.yagamin.net` の 853/443/53443 | `step-renew-dns.service` ([scripts/systemd-units/step-renew-dns.service](../scripts/systemd-units/step-renew-dns.service)) | 2026-05-19 ([internal-dns.md §7](internal-dns.md#7-step-ca-由来-cert-への置き換え-2026-05-19)) |
 
 新規 LAN サービスを HTTPS 化する際は **Nextcloud か Zabbix の構成を雛形にする**のが最速。
 
