@@ -192,9 +192,12 @@ Admin user の 3 media に同時配信
 - Phase 6-E: クレデンシャル rotation (2026-05-15、Mailgun/Discord/ntfy/Zabbix Admin/DNS PFX)
 - Phase 4-D: RKE2 クラスタ監視 (2026-05-16、Linux agent + `Kubernetes cluster state by HTTP` + Cilium pod 網への static route で 3397 items 取得)
 - RKE2 etcd 安定化 (2026-05-16、cp1 を NVMe `local-lvm` / worker1 を `store-sda` SPCC SSD に live migrate、Fanxiang QLC は backup 専用に)
+- **dns2 DoT/DoH 復旧** (2026-05-19、`/etc/dns/dns.config` の cert path フィールド末尾に literal タブ混入が真因と判明、binary patch で復旧。Zabbix item/trigger も再有効化。PR #38)
+- **dns/dns2 admin UI HTTPS (53443) 復旧** (2026-05-19、`webservice.config` の trailing-tab + 空 password の二重バグ、両ノードで TLSv1.3 + HTTP 200 確認。PR #39)
+- **dns/dns2 cert を step-ca 由来に切替 + 自動更新** (2026-05-19、JWK provisioner で発行 → PEM→PFX 変換、`step-renew-dns.service` で 7d cert を残り 5d 切ったら更新。`Verify return code: 0 (ok)` 確認。PR #40)
+- **admin-vm Zabbix 監視追加** (2026-05-19、zabbix-agent2 7.0.26 + hostid=10704、103 items 取得確認。本 PR #41)
 
 未完了:
-- dns2 の DoT/DoH 再有効化（Technitium 15.x の cert load 不具合の追跡、Issue #3）
 - 残タスク全体は [docs/remaining-tasks.md](docs/remaining-tasks.md) を参照
 
 ## ライセンス
