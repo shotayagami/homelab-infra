@@ -18,6 +18,9 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: gitea-redis
+  labels:
+    app.kubernetes.io/name: gitea-redis
+    app.kubernetes.io/part-of: gitea
 spec:
   serviceName: gitea-redis
   replicas: 1
