@@ -18,6 +18,9 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: gitea-postgres
+  labels:
+    app.kubernetes.io/name: gitea-postgres
+    app.kubernetes.io/part-of: gitea
 spec:
   serviceName: gitea-postgres
   replicas: 1
