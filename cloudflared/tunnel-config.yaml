@@ -59,5 +59,10 @@ ingress:
   # --- Catch-all (must be the last entry) ---
   - service: http_status:404
 
+# WARP routing lets enrolled Cloudflare WARP devices reach private LAN
+# resources (e.g. the FreePBX PBX at 192.168.11.57) through this tunnel's
+# connectors, without exposing SIP/RTP (UDP) on a public hostname.
+# The private-network route (CIDR -> tunnel) is registered separately in
+# Zero Trust > Networks > Routes (not part of this configurations PUT).
 warp-routing:
-  enabled: false
+  enabled: true

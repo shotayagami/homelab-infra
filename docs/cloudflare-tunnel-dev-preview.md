@@ -104,6 +104,31 @@ PR1 単体マージ直後はまだ ingress に dev-* host が無いので、ngin
 2. `cloudflared/tunnel-config.yaml` から該当 ingress エントリを削除し `scripts/cloudflared-push-tunnel-config.sh` を再実行
 3. dealmatch / crossing 側の ingress / settings から dev-* を外す
 
+## WARP private network 経由のリモート LAN アクセス (2026-05)
+
+公開ホスト名 (ingress) は HTTP/WebSocket(TCP) 専用で **SIP/RTP のような UDP は通せない**。外部の端末から LAN 上のサービス (例: FreePBX `192.168.11.57` の SIP/RTP) に届かせたい場合は、Cloudflare WARP + tunnel の private network routing を使う。WARP は実体が WireGuard なので UDP を含む全 IP を運べ、connector は outbound 接続のみ (MAP-E ルータの inbound 制限を回避)。
+
+構成:
+```
+[外部端末: WARP on] → Cloudflare edge → 同じ home-yagamin tunnel の connector → 192.168.11.0/24 の対象 IP
+```
+
+有効化:
+1. `cloudflared/tunnel-config.yaml` の `warp-routing.enabled: true` (本リポジトリで管理) を `scripts/cloudflared-push-tunnel-config.sh` で push
+2. private network route を登録 (configurations PUT には含まれない別 API):
+   ```bash
+   # CIDR -> tunnel。最小権限の観点で対象 IP だけを /32 で
+   curl -sS -X POST -H "Authorization: Bearer $CF_API_TOKEN" \
+     "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/teamnet/routes" \
+     -H 'Content-Type: application/json' \
+     -d '{"network":"192.168.11.57/32","tunnel_id":"'"$CF_TUNNEL_ID"'","comment":"FreePBX SIP remote"}'
+   ```
+   (Zero Trust > Networks > Routes でも可)
+3. Zero Trust の WARP device profile の Split Tunnel で対象 CIDR を **include** (既定の Exclude モードは 192.168.0.0/16 を除外するため、含めないと WARP を通らない)
+4. 端末に Cloudflare WARP アプリを入れ、組織に enroll。接続状態でアプリ (例: AGEphone) は LAN にいるのと同じ IP (`192.168.11.57`) で到達
+
+注意: connector を Puter LXC (LXC 102, 同一 L2) と RKE2 Pod で共有。どちらの connector でも `192.168.11.57` に到達可能。
+
 ## 関連
 
 - [`cloudflared/README.md`](../cloudflared/README.md) — cloudflared 全体構成
