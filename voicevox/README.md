@@ -31,5 +31,5 @@ sox out.wav -r 8000 -c 1 -t wav prompt.wav   # or ffmpeg
 変換後の WAV を FreePBX の Admin → System Recordings でアップロードして IVR/アナウンスで参照。
 
 ## メモ
-- 画像は当面 `cpu-latest`。GitOps 再現性のため初回 sync 後に稼働中バージョンへ pin する(TODO, deployment.yaml)。
+- イメージは `cpu-0.25.2` に pin 済(稼働確認版、digest `sha256:eb8c7f46…`)。GitOps 再現性のため `cpu-latest` は使わない。
 - cp1 はメモリ逼迫のため worker1 へ soft 寄せ。idle 時は軽量、生成時のみ CPU を使う。

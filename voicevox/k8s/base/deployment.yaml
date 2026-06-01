@@ -33,8 +33,9 @@ spec:
                     values: ["k8s-worker1"]
       containers:
         - name: voicevox-engine
-          # TODO: pin to a concrete tag (e.g. cpu-0.x.y) after first sync for GitOps reproducibility.
-          image: voicevox/voicevox_engine:cpu-latest
+          # Pinned to the verified running version for GitOps reproducibility
+          # (digest sha256:eb8c7f46a7d01217d1ff2b6f018261faedeceded3cc756b4fbbf371791ad6c90).
+          image: voicevox/voicevox_engine:cpu-0.25.2
           ports:
             - name: http
               containerPort: 50021
