@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voicevox
+  namespace: voicevox
+  labels:
+    app: voicevox
+    app.kubernetes.io/name: voicevox
+    app.kubernetes.io/part-of: voicevox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: voicevox
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: voicevox
+        app.kubernetes.io/name: voicevox
+        app.kubernetes.io/part-of: voicevox
+    spec:
+      # cp1 is memory-tight; prefer worker1 which has headroom (soft, not hard pin).
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values: ["k8s-worker1"]
+      containers:
+        - name: voicevox-engine
+          # TODO: pin to a concrete tag (e.g. cpu-0.x.y) after first sync for GitOps reproducibility.
+          image: voicevox/voicevox_engine:cpu-latest
+          ports:
+            - name: http
+              containerPort: 50021
+          resources:
+            requests:
+              cpu: 100m
+              memory: 300Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /version
+              port: 50021
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /version
+              port: 50021
+            initialDelaySeconds: 40
+            periodSeconds: 30

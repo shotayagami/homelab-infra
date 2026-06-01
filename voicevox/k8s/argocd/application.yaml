@@ -1,0 +1,38 @@
+---
+# ArgoCD Application for VOICEVOX engine (Japanese neural TTS).
+# Used to pre-generate Japanese IVR/announcement prompts for FreePBX (LXC 109):
+#   text -> VOICEVOX /audio_query + /synthesis -> WAV -> convert -> System Recordings.
+#
+# Source repo: homelab-infra on GitHub (Public), consistent with cloudflared.
+# Bootstrap: after the parent PR merges to main, run once
+#   kubectl apply -f voicevox/k8s/argocd/application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: voicevox
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shotayagami/homelab-infra.git
+    targetRevision: main
+    path: voicevox/k8s/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: voicevox
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m
