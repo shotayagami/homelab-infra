@@ -56,6 +56,18 @@ ingress:
     originRequest:
       noTLSVerify: true
 
+  # --- ICS-TV (24h リニア配信のコントロールプレーン / RKE2 ingress-nginx) ---
+  # Host は書き換えず保持 (Django セッション cookie の admin を出すため cookie ドメイン整合)。
+  # tv = 本番 (公開番組表 + 内部 admin)、dev-tv = 開発 (関係者限定 preview)。
+  - hostname: tv.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: dev-tv.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+
   # --- Catch-all (must be the last entry) ---
   - service: http_status:404
 
