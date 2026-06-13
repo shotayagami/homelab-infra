@@ -59,11 +59,29 @@ ingress:
   # --- ICS-TV (24h リニア配信のコントロールプレーン / RKE2 ingress-nginx) ---
   # Host は書き換えず保持 (Django セッション cookie の admin を出すため cookie ドメイン整合)。
   # tv = 本番 (公開番組表 + 内部 admin)、dev-tv = 開発 (関係者限定 preview)。
+  # studio / dev-studio = 配信オペレータ向け UI。studio は CF Access で関係者限定、
+  # dev-studio はその dev 版 (CF Access ポリシーは studio を踏襲)。
+  #
+  # NOTE: backend は in-cluster Service FQDN (icstv-web.icstv-dev.svc.cluster.local)
+  # ではなく ingress-nginx の LAN IP 192.168.11.80:443 を指す。この tunnel は
+  # RKE2 Pod 連結子と Puter LXC (LXC 102) 連結子で共有されており、CF は両連結子に
+  # リクエストを振り分ける。svc.cluster.local は LXC 102 側から名前解決できず
+  # 断続的 502 になるため、両連結子から到達可能な LAN IP を使う
+  # ([[cloudflared-tunnel-homelab]] の Puter/127.0.0.1 ループ回避と同じ理由)。
+  # ingress 側に dev-studio.yagamin.net の host ルールは登録済 (icstv-web / icstv-dev ns)。
   - hostname: tv.yagamin.net
     service: https://192.168.11.80:443
     originRequest:
       noTLSVerify: true
   - hostname: dev-tv.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: studio.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: dev-studio.yagamin.net
     service: https://192.168.11.80:443
     originRequest:
       noTLSVerify: true

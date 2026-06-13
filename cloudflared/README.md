@@ -49,6 +49,21 @@ cloudflared/
 
 すべて `https://192.168.11.80:443` (cp1 上の rke2 ingress-nginx) に `noTLSVerify: true` で繋ぐ。Host ヘッダは書き換えず、ingress 側で `dev-*.yagamin.net` を直接受ける。`dev-*` は **一般公開せず** 関係者限定。検索エンジン除外は ingress-nginx の `server-snippet` annotation が cluster admission webhook で拒否される (`allow-snippet-annotations: false`、CVE-2024-7646 緩和) ため、アプリ側 Django middleware で `X-Robots-Tag: noindex, nofollow, noarchive` を付与、加えて `/robots.txt` で `Disallow: /` を返す二重防御。
 
+### ICS-TV (RKE2 ingress-nginx 経由)
+
+| 公開ホスト | 上流 | アクセス制御 |
+|---|---|---|
+| `tv.yagamin.net` | icstv-web (`icstv` ns, 本番) | 公開番組表 + 内部 admin |
+| `dev-tv.yagamin.net` | icstv-web (`icstv-dev` ns) | 関係者限定 preview |
+| `dev-studio.yagamin.net` | icstv-web (`icstv-dev` ns) | **CF Access** (`studio.yagamin.net` を踏襲) |
+
+上記も Dev preview と同じく `https://192.168.11.80:443` に `noTLSVerify: true` で繋ぎ、Host ヘッダは保持する (ingress 側で各ホストを直接受ける)。
+
+> **なぜ Service FQDN (`icstv-web.icstv-dev.svc.cluster.local`) を直に指さないか**
+> この tunnel は in-cluster cloudflared (RKE2 Pod) と Puter LXC (LXC 102) の双方の接続子が共有しており、CF はリクエストを両接続子へ振り分ける。`*.svc.cluster.local` は LXC 102 側から名前解決できないため、その接続子に当たったリクエストが断続的に 502 になる。両接続子から到達可能な ingress の LAN IP (`192.168.11.80:443`) を指すことで回避する (Puter の `127.0.0.1` ループ回避と同じ理由)。
+
+`dev-studio` / `studio` は CF Access (self-hosted application) で関係者のみに限定する。`dev-studio` の Access App + Policy は [`scripts/cloudflared-ensure-access.sh`](../scripts/cloudflared-ensure-access.sh) で `studio.yagamin.net` のライブ設定を複製 (踏襲) する。ポリシーは SRC から逐語コピーするため、`studio` 側を変えたら再実行で追従する。
+
 ## 運用手順
 
 ### 公開ホストを足す
@@ -68,6 +83,20 @@ cloudflared/
    ```
 
 `scripts/cloudflared-push-tunnel-config.sh` / `cloudflared-ensure-dns.sh` は idempotent。
+
+### CF Access で関係者限定にする (任意)
+
+既存の Access App を踏襲して新ホストへ複製する:
+
+```bash
+cd ~/homelab-infra
+DRY_RUN=1 SRC_DOMAIN=studio.yagamin.net DST_DOMAIN=dev-studio.yagamin.net \
+  scripts/cloudflared-ensure-access.sh        # 計画確認
+SRC_DOMAIN=studio.yagamin.net DST_DOMAIN=dev-studio.yagamin.net \
+  scripts/cloudflared-ensure-access.sh        # 適用 (App + Policy を複製)
+```
+
+App は domain 一致、Policy は name 一致で idempotent に upsert する。`studio.yagamin.net` の Access App が存在することが前提。
 
 ### 公開ホストを止める
 
