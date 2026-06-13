@@ -1,8 +1,10 @@
 # homelab-infra
 
-ホームラボ Proxmox VE 環境の構成管理リポジトリ。Zabbix 監視基盤 + 通知 (ntfy / Discord / Email) を中心に、関連スクリプトとドキュメントを集約する。
+ホームラボ Proxmox VE 環境の構成管理リポジトリ。2 ノードクラスタ `homelab` (192.168.11.11 / .12) 上で、Zabbix 監視基盤 + 通知 (ntfy / Discord / Email) を中心に、関連スクリプトとドキュメントを集約する。
 
 ## ハードウェア構成
+
+2026-06-10 より **2 ノードクラスタ `homelab`** で運用している。以下の表は本番ノード `proxmox` (192.168.11.11) の詳細。2 台目 `pve2` (192.168.11.12、i5-9500 / 32 GiB / SATA SSD 480 GB 1 本) を加えたクラスタ構成・ゲスト配置・移行時の帯域制限は [docs/proxmox-cluster.md](docs/proxmox-cluster.md) を参照。
 
 | 項目 | 内容 |
 |---|---|
@@ -10,30 +12,36 @@
 | CPU | Intel Core i5-8500 (Coffee Lake, 6C/6T, 3.0–4.1 GHz) |
 | メモリ | 32 GiB DDR4-2400 (4×8 GB、4 スロット全埋め、最大 64 GB) |
 | 主ストレージ | Samsung 970 EVO Plus 1 TB NVMe — `local-lvm` (LVM-thin 794 GB) + `local` |
-| 追加 SSD A | SPCC 480 GB SATA TLC — `store-sda` (RKE2 worker1 / Longhorn replica) |
+| 追加 SSD A | SPCC 480 GB SATA TLC — `store-sda` (旧 RKE2 worker1 ルート。worker1 を `pve2` へ移設後は空き) |
 | 追加 SSD B | Fanxiang S101Q 1 TB SATA QLC — `store-sdb` (バックアップ専用) |
 | USB HDD ×4 | WDC 8/4 TB + Seagate 3/2 TB (計 ~15.6 TiB) — **OpenMediaVault VM (VMID 100) に disk passthrough**、PVE 側ではマウントしない |
 | NIC | Intel I219-LM オンボード 1 GbE → `vmbr0` 192.168.11.11/24 |
-| Hypervisor | Proxmox VE 9.1.14 / Kernel 7.0.2-4-pve (proxmox-kernel-7.0、2026-05-19 apt upgrade) |
+| Hypervisor | Proxmox VE 9.2.3 / Kernel 7.0.6-2-pve (`pve2` とクラスタ版を統一) |
 
-詳細・storage tier の決定経緯・拡張余地は [docs/hardware.md](docs/hardware.md) を参照。
+詳細・storage tier の決定経緯・拡張余地は [docs/hardware.md](docs/hardware.md)、クラスタ全体は [docs/proxmox-cluster.md](docs/proxmox-cluster.md) を参照。
 
 ## 主要対象
 
-| 役割 | VMID/CTID | 種別 | IP | 概要 |
-|---|---|---|---|---|
-| Proxmox VE 9.1 (ハイパーバイザ) | — | host | 192.168.11.11 | Debian 13 ベース |
-| OpenMediaVault (NAS) | 100 | VM | (LAN 上) | USB HDD 4 台 (8/4/3/2 TB) を SATA1-4 として passthrough、SMB/NFS で配信 |
-| Zabbix 7.0 LTS | 190 | LXC | 192.168.11.55 | 監視サーバ + Web UI + PostgreSQL 16 |
-| ntfy 2.22 | 191 | LXC | 192.168.11.56 | モバイル push 通知、CF Tunnel 公開 |
-| dns / dns2 (Technitium DNS) | 104 / 105 | LXC | 192.168.11.53 / .54 | 内部 DNS Primary/Secondary |
-| step-ca | 107 | LXC | 192.168.11.61 | 内部 PKI (smallstep) |
-| nextcloud | 108 | LXC | 192.168.11.62 | ファイル共有 + Office |
-| pg-db | 106 | LXC | 192.168.11.60 | アプリ用 PostgreSQL 17 (RKE2 上の Django アプリの外部 DB) |
-| puter | 102 | LXC | 192.168.11.174 | セルフホスト Internet OS (Docker Compose、CF Tunnel で `puter.yagamin.net` 他公開) |
-| k8s-cp1 (RKE2 control plane) | 110 | VM | 192.168.11.80 | RKE2 v1.34.3、ArgoCD/Harbor/Gitea/Longhorn 等を載せる検証クラスタ |
-| k8s-worker1 (RKE2 worker) | 120 | VM | 192.168.11.83 | Longhorn replica ホスト (`store-sda` 上) |
-| admin-vm | 150 | VM | 192.168.11.10 | 運用クライアント、`/usr/local/bin` に `pct/qm/pvesh/pveum` SSH ラッパー設置済、Zabbix 監視 (hostid=10704、2026-05-19 追加) |
+「ノード」列は 2 ノードクラスタ上での現在の稼働ノード。HW パススルー・etcd・DB 書き込みの都合で固定するもの、冗長化のため意図的に分散するものがある (詳細と固定理由は [docs/proxmox-cluster.md](docs/proxmox-cluster.md))。
+
+| 役割 | VMID/CTID | 種別 | ノード | IP | 概要 |
+|---|---|---|---|---|---|
+| Proxmox VE 9.2 (ハイパーバイザ・本番) | — | host | proxmox (.11) | 192.168.11.11 | nodeid 1、Debian 13 ベース。移設不可ワークロードを固定 |
+| Proxmox VE 9.2 (ハイパーバイザ・受け皿) | — | host | pve2 (.12) | 192.168.11.12 | nodeid 2、i5-9500 / 32 GiB / SSD 480 GB。RAM 逃がし先・冗長化 |
+| OpenMediaVault (NAS) | 100 | VM | proxmox | (LAN 上) | USB HDD 4 台 (8/4/3/2 TB) を SATA1-4 として passthrough、SMB/NFS で配信 |
+| puter | 102 | LXC | proxmox | 192.168.11.174 | セルフホスト Internet OS (Docker Compose、CF Tunnel で `puter.yagamin.net` 他公開) |
+| dns (Technitium DNS Primary) | 104 | LXC | proxmox | 192.168.11.53 | 内部 DNS Primary |
+| pg-db | 106 | LXC | proxmox | 192.168.11.60 | アプリ用 PostgreSQL 17 (RKE2 上の Django アプリの外部 DB)。書き込み律速回避で `.11` 固定 |
+| step-ca | 107 | LXC | proxmox | 192.168.11.61 | 内部 PKI (smallstep) |
+| nextcloud | 108 | LXC | proxmox | 192.168.11.62 | ファイル共有 + Office |
+| freepbx | 109 | LXC | proxmox | 192.168.11.57 | 構内内線 PBX (FreePBX 17 / Asterisk 22) |
+| k8s-cp1 (RKE2 control plane) | 110 | VM | proxmox | 192.168.11.80 | RKE2 v1.34.3、ArgoCD/Harbor/Gitea/Longhorn 等。etcd fsync の都合で NVMe のある `.11` 固定 |
+| admin-vm | 150 | VM | proxmox | 192.168.11.10 | 運用クライアント、`/usr/local/bin` に `pct/qm/pvesh/pveum` SSH ラッパー設置済、Zabbix 監視 (hostid=10704、2026-05-19 追加) |
+| dns2 (Technitium DNS Secondary) | 105 | LXC | pve2 | 192.168.11.54 | 内部 DNS Secondary。dns(.11) と物理分散して冗長化 |
+| k8s-worker1 (RKE2 worker) | 120 | VM | pve2 | 192.168.11.83 | Longhorn replica ホスト (`store-sda` ではなく `pve2` の `local-lvm` 上)。RAM 逃がしで `.12` へ移設 |
+| icstv-playout2 | 131 | LXC | pve2 | 192.168.11.20 | ICS-TV 送出ノード (CasparCG/MediaMTX/icstv-agent)、`pve2` iGPU を passthrough |
+| Zabbix 7.0 LTS | 190 | LXC | pve2 | 192.168.11.55 | 監視サーバ + Web UI + PostgreSQL 16。`.11` 障害でも生存させるため `.12` へ |
+| ntfy 2.22 | 191 | LXC | pve2 | 192.168.11.56 | モバイル push 通知、CF Tunnel 公開 |
 
 ## ディレクトリ構成
 
@@ -43,7 +51,8 @@
 ├── .gitignore                    ← 機微情報を除外する設定
 ├── .env.example                  ← .env のテンプレート
 ├── docs/                         ← 運用ドキュメント
-│   ├── hardware.md                    ← ハードウェア詳細 + storage tier 設計
+│   ├── hardware.md                    ← ハードウェア詳細 + storage tier 設計 (本番ノード .11)
+│   ├── proxmox-cluster.md             ← 2 ノードクラスタ homelab (ノード/配置/移行帯域制限)
 │   ├── proxmox-firewall.md            ← PVE Firewall 運用・ロックアウト復旧
 │   ├── proxmox-host-self-healing.md   ← network-watchdog / vm-health-monitor 自律復旧層
 │   ├── admin-vm-tooling.md            ← admin-vm の pct/qm/pvesh ラッパー

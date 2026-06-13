@@ -5,11 +5,11 @@
 ## 1. 目的と前提
 
 ### 目的
-Proxmox VE (192.168.11.11) 上で稼働している VM/LXC の **死活監視を自動化**する。
+2 ノードクラスタ `homelab` (`proxmox` 192.168.11.11 / `pve2` 192.168.11.12、[docs/proxmox-cluster.md](proxmox-cluster.md)) 上で稼働している VM/LXC の **死活監視を自動化**する。
 さらに将来的に CPU/メモリ/ディスク/ネットワーク等のメトリクスやサービス層の監視まで拡張できる基盤とする。
 
 ### 監視対象（現時点で把握しているもの）
-- **PVE ホスト**: `proxmox` (192.168.11.11)
+- **PVE ホスト**: `proxmox` (192.168.11.11) / `pve2` (192.168.11.12)。`Proxmox VE by HTTP` テンプレが API 経由でクラスタ→両ノード→VM/CT を自動 LLD するほか、`pve2` には in-guest の zabbix-agent2 も導入済
 - **LXC 102 `puter`**: Puter セルフホスト（[[proxmox_puter]]）
 - **LXC 104 `dns`** : 192.168.11.53 — Technitium DNS Primary（[[proxmox_dns_vms]]）
 - **LXC 105 `dns2`**: 192.168.11.54 — Technitium DNS Secondary
