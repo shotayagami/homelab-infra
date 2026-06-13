@@ -39,6 +39,9 @@ DEFAULT_HOSTS=(
   dev-pairs.yagamin.net
   dev-mensbar.yagamin.net
   dev-lilies.yagamin.net
+  tv.yagamin.net
+  dev-tv.yagamin.net
+  dev-studio.yagamin.net
 )
 
 if [[ $# -gt 0 ]]; then
