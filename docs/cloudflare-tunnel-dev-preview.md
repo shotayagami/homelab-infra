@@ -115,19 +115,41 @@ PR1 単体マージ直後はまだ ingress に dev-* host が無いので、ngin
 
 有効化:
 1. `cloudflared/tunnel-config.yaml` の `warp-routing.enabled: true` (本リポジトリで管理) を `scripts/cloudflared-push-tunnel-config.sh` で push
-2. private network route を登録 (configurations PUT には含まれない別 API):
+2. private network route を登録 (configurations PUT には含まれない別 API)。冪等な管理スクリプトで:
    ```bash
-   # CIDR -> tunnel。最小権限の観点で対象 IP だけを /32 で
-   curl -sS -X POST -H "Authorization: Bearer $CF_API_TOKEN" \
-     "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/teamnet/routes" \
-     -H 'Content-Type: application/json' \
-     -d '{"network":"192.168.11.57/32","tunnel_id":"'"$CF_TUNNEL_ID"'","comment":"FreePBX SIP remote"}'
+   DRY_RUN=1 scripts/cloudflared-ensure-teamnet-routes.sh   # plan
+   scripts/cloudflared-ensure-teamnet-routes.sh             # apply (CIDR=comment を引数で上書き可)
    ```
-   (Zero Trust > Networks > Routes でも可)
-3. Zero Trust の WARP device profile の Split Tunnel で対象 CIDR を **include** (既定の Exclude モードは 192.168.0.0/16 を除外するため、含めないと WARP を通らない)
-4. 端末に Cloudflare WARP アプリを入れ、組織に enroll。接続状態でアプリ (例: AGEphone) は LAN にいるのと同じ IP (`192.168.11.57`) で到達
+   desired set (最小権限の観点で対象 IP だけを `/32` で登録):
 
-注意: connector を Puter LXC (LXC 102, 同一 L2) と RKE2 Pod で共有。どちらの connector でも `192.168.11.57` に到達可能。
+   | CIDR | 用途 |
+   |---|---|
+   | `192.168.11.57/32` | FreePBX SIP remote ([[FreePBX 構内内線 (LXC 109)]]) |
+   | `192.168.11.20/32` | ICS-TV playout SRT ingest (送出ノード LXC131 の MediaMTX `:8890`) |
+
+   (Zero Trust > Networks > Routes でも可)
+3. Zero Trust の WARP device profile の Split Tunnel で対象 CIDR を WARP 経由にする (既定の Exclude モードは 192.168.0.0/16 を除外するため、その CIDR を除外から外す / carve-out しないと WARP を通らない)
+4. SRT ingest (UDP) のアクセス制御は CF Access (HTTP 用) ではなく Gateway > Firewall Policies > Network で行う (例: `dst 192.168.11.20` / `dst port 8890` を配信担当の identity/device にのみ許可 + 既定 block)
+5. 端末に Cloudflare WARP アプリを入れ、組織に enroll。接続状態でアプリは LAN にいるのと同じ IP (`192.168.11.57` / `192.168.11.20`) で到達
+
+注意: connector を Puter LXC (LXC 102, 同一 L2) と RKE2 Pod で共有。どちらの connector でも対象 LAN IP に到達可能。
+
+### ICS-TV playout SRT ingest (192.168.11.20) の実体 (2026-06-14)
+
+送出ノード LXC131 の MediaMTX (`:8890`, UDP) へ現場端末から SRT publish させるための WARP 設定。`teamnet/routes` 以外は Zero Trust ダッシュボード/API の状態でリポジトリ管理外のため、ロールバック用に実値を控える。
+
+1. **private network route**: `scripts/cloudflared-ensure-teamnet-routes.sh` で `192.168.11.20/32` を登録済。
+2. **Split Tunnel carve-out** (default device policy, Exclude モード): 既定の `192.168.11.0/27` を `.20` だけ抜いた最小集合へ置換。
+   - 削除: `192.168.11.0/27`
+   - 追加: `192.168.11.0/28`, `192.168.11.16/30`, `192.168.11.21/32`, `192.168.11.22/31`, `192.168.11.24/29`
+   - 効果: `.20` が除外から外れ WARP 経由に (`.57` の carve-out と同じ手法)。他レンジは不変。
+   - 注意: custom device profile (`Onboarding Device profile`) が別に存在。現場端末が default profile に乗っていることを確認すること。
+   - ロールバック: 上記 5 件を削除し `192.168.11.0/27` を戻す。
+3. **Gateway network (L4) ポリシー** (UDP は CF Access 不可のため Gateway で制御。`.20` のみにスコープし global default-block は使わない):
+   - allow (prec 10): `net.dst.ip == 192.168.11.20 and net.dst.port == 8890` + `identity.email` が studio と同じ staff ドメイン (`nekomin.jp` / `yagamin.net` / `circle-ics.com` / `eqwel.co.jp` / `whatsapp.co.jp`) にマッチ
+   - block (prec 20): `net.dst.ip == 192.168.11.20` (それ以外全部)
+   - ロールバック: 当該 2 ルールを名前 `ICS-TV playout SRT — …` で削除。
+4. **現場端末**: Cloudflare WARP を入れ組織に enroll (上記 staff ドメインの identity でログイン)。SRT URL は `srt://192.168.11.20:8890?streamid=publish:live/ch1&latency=2000&passphrase=<pp>`。
 
 ## 関連
 
