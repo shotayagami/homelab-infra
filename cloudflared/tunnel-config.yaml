@@ -86,6 +86,21 @@ ingress:
     originRequest:
       noTLSVerify: true
 
+  # --- ICS-TV deliver (業者向け納品ポータル / RKE2 ingress-nginx) ---
+  # 外部の配信業者が素材を納品するための UI。studio.* / dev-studio.* と違い
+  # **CF Access は付けない** — 業者がトンネル経由で到達できる必要があり、Access を
+  # 挟むと弾かれるため。アクセス制御は Django 側の Google サインイン + 招待で担保する。
+  # よって cloudflared-ensure-access.sh の対象に deliver を含めないこと。
+  # deliver = 本番、dev-deliver = 開発。Host は書き換えず保持 (cookie ドメイン整合)。
+  - hostname: deliver.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: dev-deliver.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+
   # --- Catch-all (must be the last entry) ---
   - service: http_status:404
 
