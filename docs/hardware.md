@@ -34,7 +34,7 @@ i5-8500 は HT 非搭載のため物理 6 コア = 論理 6 スレッド。RKE2 
 | デバイス | モデル | 容量 | I/F | PVE storage 名 | 主な役割 |
 |---|---|---|---|---|---|
 | `nvme0n1` | Samsung 970 EVO Plus 1TB | 931.5 GiB | NVMe (PCIe 3.0 x4) | `local-lvm` (LVM-thin 794 GB) + `local` (96 GB) | **OS (`pve-root`) + 主要 VM/LXC ディスク + RKE2 cp1 etcd** |
-| `sda` | SPCC Solid State Disk | 476.9 GiB | SATA SSD (TLC 推定) | `store-sda` (dir, ext4) | RKE2 worker1 ルートディスク / Longhorn replica |
+| `sda` | SPCC Solid State Disk | 476.9 GiB | SATA SSD (TLC 推定) | `store-sda` (dir, ext4) | 旧 RKE2 worker1 ルート。2026-06-10 に worker1 を `pve2` へ移設したため**現在は空き** ([proxmox-cluster.md](proxmox-cluster.md)) |
 | `sdb` | Fanxiang S101Q 1TB | 953.9 GiB | SATA SSD (QLC) | `store-sdb` (dir, ext4) | **バックアップ専用** (Zabbix dump / Config export) |
 | `sdc` | WDC WD80EAZZ-00BKLB0 | 7.3 TiB | USB 3.x HDD | (PVE 非管理) | **OMV (VMID 100) に disk passthrough** → `sata1` |
 | `sdd` | WDC WD40EZAZ-00SF3B0 | 3.6 TiB | USB 3.x HDD | (PVE 非管理) | **OMV (VMID 100) に disk passthrough** → `sata4` |
@@ -57,7 +57,7 @@ i5-8500 は HT 非搭載のため物理 6 コア = 論理 6 スレッド。RKE2 
 
 - **`local-lvm` (NVMe LVM-thin)**: 全 VM/LXC ディスクのデフォルト置き場。snapshot 対応、thin provisioning で実使用は 21%
 - **`local` (NVMe / `/var/lib/vz`)**: ISO、CT template、vzdump backup の一時置き
-- **`store-sda` (SPCC SATA SSD)**: 性能が必要な「2 軍ストレージ」枠。worker1 ルート、Longhorn replica
+- **`store-sda` (SPCC SATA SSD)**: 性能が必要な「2 軍ストレージ」枠。元は worker1 ルート / Longhorn replica だったが、2026-06-10 に worker1 を `pve2` へ移設して**現在は空き** ([proxmox-cluster.md](proxmox-cluster.md))。`.11` 側に置きたい I/O 要求の高いディスクの受け皿として再利用可
 - **`store-sdb` (Fanxiang QLC SATA SSD)**: バックアップ専用。`vzdump` の保存先、Zabbix Config export
 - **USB HDD 群 (`sdc`–`sdf`)**: PVE 側ではマウントせず、`qm config 100` で `sata1`〜`sata4` として OpenMediaVault VM (VMID 100) に **disk passthrough** 済。OMV 内で ZFS/ext4 のプールを構成し、SMB/NFS で他 VM・LXC・物理クライアントから利用 (例: Nextcloud は `files_external` 経由で `/mnt/omv/nas/*` を参照していた経緯あり、`docs/proxmox-zabbix-monitoring.md` の Nextcloud 復旧ログ参照)。**PVE ホスト側で直接マウント/フォーマットしない** こと (OMV のファイルシステムを破壊する)
 
@@ -71,18 +71,18 @@ i5-8500 は HT 非搭載のため物理 6 コア = 論理 6 スレッド。RKE2 
 | 内部 CNI | `cilium_host` 10.42.0.4/32 (RKE2 のみ、admin-vm から static route で到達) |
 | Docker bridge | `docker0` 172.17.0.0/16 (現在 DOWN、未使用) |
 
-1 GbE 1 本のため、Longhorn replica の同期帯域が NIC 飽和することがある (実測あり)。マルチノード化するなら 2.5 GbE NIC 増設 (PCIe x1 で十分) が現実的。
+1 GbE 1 本のため、Longhorn replica の同期帯域が NIC 飽和することがある (実測あり)。2026-06-10 の 2 ノードクラスタ化 ([docs/proxmox-cluster.md](proxmox-cluster.md)) で worker1 を `pve2` へ分けたことにより、Longhorn 複製が `.11`↔`.12` の 1 GbE を恒常的に跨ぐようになった。大量 migration がこのリンクを飽和させると Longhorn I/O が詰まるため `datacenter.cfg` に `bwlimit: migration=61440` を設定済。恒久的には 2.5 GbE NIC 増設 (PCIe x1 で十分) が本筋。
 
 ## ハイパーバイザ・OS
 
 | 項目 | バージョン |
 |---|---|
-| Proxmox VE | 9.1.14 (running 9.1.14/7d542528ee1851f7、2026-05-19 apt upgrade) |
-| Kernel | Linux 7.0.2-4-pve (proxmox-kernel-7.0 系、signed, Debian 13 ベース) |
+| Proxmox VE | 9.2.3 (2026-06-10 に `pve2` とクラスタ版を統一。元 9.1.14) |
+| Kernel | Linux 7.0.6-2-pve (proxmox-kernel-7.0 系、signed, Debian 13 ベース) |
 | ストレージドライバ | LVM 2.03.31-2+pmx1、ZFS 2.4.2-pve1 (zfsutils インストール済だが未使用) |
 | Container | lxc-pve 7.0.0-1、lxcfs 7.0.0-pve1 |
 | KVM | pve-qemu-kvm 11.0.0-2、qemu-server 9.1.12 |
-| クラスタ | corosync 3.1.10-pve2 インストール済 (シングルノードのため未参加) |
+| クラスタ | **2 ノードクラスタ `homelab` に参加 (nodeid 1)**。corosync 3.1.10-pve2、`two_node:1`+`wait_for_all:0`。詳細は [docs/proxmox-cluster.md](proxmox-cluster.md) |
 | Ceph | 19.2.3-pve4 インストール済 (未使用) |
 | Backup | proxmox-backup-client 4.2.0-1 (`vzdump` で sdb に出力) |
 
@@ -92,7 +92,7 @@ i5-8500 は HT 非搭載のため物理 6 コア = 論理 6 スレッド。RKE2 
    - 価格は変動が大きい。2026 年 5 月時点で AI 向け HBM への DRAM 製造シフトにより DDR4 が逼迫し、16 GB DIMM 単体が ~18,000 円台 (セール時)、64 GB 換装は **実勢 4〜7 万円**。2025 年前半までは 1 万円台で 64 GB 化が可能だったが、現状大きく乖離。供給回復は 2027 後半以降との見方が多い ([Tom's Hardware: RAM price index 2026](https://www.tomshardware.com/pc-components/ram/ram-price-index-2026-lowest-price-on-ddr5-and-ddr4-memory-of-all-capacities))。
 2. **2.5 GbE NIC**: Realtek RTL8125B 系の安価カードで 1 GbE → 2.5 GbE 化。Longhorn replica の同期で恩恵
 3. **NVMe 増設**: マザー上の 2nd M.2 スロット (もしあれば) で OS と VM 領域を物理分離
-4. **PVE クラスタ化**: 同型機 (EliteDesk 800 G4 SFF) をジャンク調達 → 2 ノード化、HA 検証。corosync は既に入っているので追加コストは低い
+4. ~~**PVE クラスタ化**: 同型機 (EliteDesk 800 G4 SFF) をジャンク調達 → 2 ノード化、HA 検証~~ → **2026-06-10 実施済** (`pve2` 192.168.11.12 を追加して 2 ノードクラスタ `homelab` 化。[docs/proxmox-cluster.md](proxmox-cluster.md))。HA フェンシングは未使用
 
 ## 関連
 
