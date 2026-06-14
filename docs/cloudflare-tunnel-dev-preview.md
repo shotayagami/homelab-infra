@@ -115,19 +115,24 @@ PR1 単体マージ直後はまだ ingress に dev-* host が無いので、ngin
 
 有効化:
 1. `cloudflared/tunnel-config.yaml` の `warp-routing.enabled: true` (本リポジトリで管理) を `scripts/cloudflared-push-tunnel-config.sh` で push
-2. private network route を登録 (configurations PUT には含まれない別 API):
+2. private network route を登録 (configurations PUT には含まれない別 API)。冪等な管理スクリプトで:
    ```bash
-   # CIDR -> tunnel。最小権限の観点で対象 IP だけを /32 で
-   curl -sS -X POST -H "Authorization: Bearer $CF_API_TOKEN" \
-     "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/teamnet/routes" \
-     -H 'Content-Type: application/json' \
-     -d '{"network":"192.168.11.57/32","tunnel_id":"'"$CF_TUNNEL_ID"'","comment":"FreePBX SIP remote"}'
+   DRY_RUN=1 scripts/cloudflared-ensure-teamnet-routes.sh   # plan
+   scripts/cloudflared-ensure-teamnet-routes.sh             # apply (CIDR=comment を引数で上書き可)
    ```
-   (Zero Trust > Networks > Routes でも可)
-3. Zero Trust の WARP device profile の Split Tunnel で対象 CIDR を **include** (既定の Exclude モードは 192.168.0.0/16 を除外するため、含めないと WARP を通らない)
-4. 端末に Cloudflare WARP アプリを入れ、組織に enroll。接続状態でアプリ (例: AGEphone) は LAN にいるのと同じ IP (`192.168.11.57`) で到達
+   desired set (最小権限の観点で対象 IP だけを `/32` で登録):
 
-注意: connector を Puter LXC (LXC 102, 同一 L2) と RKE2 Pod で共有。どちらの connector でも `192.168.11.57` に到達可能。
+   | CIDR | 用途 |
+   |---|---|
+   | `192.168.11.57/32` | FreePBX SIP remote ([[FreePBX 構内内線 (LXC 109)]]) |
+   | `192.168.11.20/32` | ICS-TV playout SRT ingest (送出ノード LXC131 の MediaMTX `:8890`) |
+
+   (Zero Trust > Networks > Routes でも可)
+3. Zero Trust の WARP device profile の Split Tunnel で対象 CIDR を WARP 経由にする (既定の Exclude モードは 192.168.0.0/16 を除外するため、その CIDR を除外から外す / carve-out しないと WARP を通らない)
+4. SRT ingest (UDP) のアクセス制御は CF Access (HTTP 用) ではなく Gateway > Firewall Policies > Network で行う (例: `dst 192.168.11.20` / `dst port 8890` を配信担当の identity/device にのみ許可 + 既定 block)
+5. 端末に Cloudflare WARP アプリを入れ、組織に enroll。接続状態でアプリは LAN にいるのと同じ IP (`192.168.11.57` / `192.168.11.20`) で到達
+
+注意: connector を Puter LXC (LXC 102, 同一 L2) と RKE2 Pod で共有。どちらの connector でも対象 LAN IP に到達可能。
 
 ## 関連
 
