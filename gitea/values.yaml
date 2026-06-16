@@ -75,8 +75,22 @@ ingress:
   className: nginx
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
+  # `gitea.home.yagamin.net` is the LAN host (direct ingress). `gitea.yagamin.net`
+  # is the public host reached through the Cloudflare Tunnel + CF Access (mirrors
+  # the icstv tv/studio pattern: same backend, second host rule, Host preserved).
+  # The tunnel route is in cloudflared/tunnel-config.yaml; the CF Access app is
+  # provisioned by scripts/cloudflared-ensure-access.sh (踏襲 studio.yagamin.net).
+  # NOTE: gitea's ROOT_URL stays gitea.home.yagamin.net, so clone URLs / absolute
+  # links rendered for the public host still point at the LAN host by design — the
+  # public host is for browsing/admin under CF Access, not anonymous git-over-HTTP.
+  # The cert for gitea.yagamin.net is issued by letsencrypt-prod via DNS-01
+  # (Cloudflare), which works even though CF Access fronts the host.
   hosts:
     - host: gitea.home.yagamin.net
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: gitea.yagamin.net
       paths:
         - path: /
           pathType: Prefix
@@ -84,6 +98,9 @@ ingress:
     - hosts:
         - gitea.home.yagamin.net
       secretName: gitea-home-yagamin-net-tls
+    - hosts:
+        - gitea.yagamin.net
+      secretName: gitea-yagamin-net-tls
 
 persistence:
   enabled: true

@@ -91,10 +91,14 @@ Bitnami Helm chart ベース。CMS + 一部静的サイト用途。
 
 | 項目 | 値 |
 |---|---|
-| 内部 URL | `https://gitea.home.yagamin.net` |
-| 外部 URL | `https://gitea.yagamin.net` (Cloudflare Access 保護) |
-| TLS | Let's Encrypt (`*.yagamin.net`) |
+| 内部 URL | `https://gitea.home.yagamin.net` (LAN / WARP) |
+| 外部 URL | `https://gitea.yagamin.net` (Cloudflare Tunnel + CF Access、studio policy 踏襲) |
+| TLS | Let's Encrypt (DNS-01)。ingress に両ホストの cert (`gitea-home-yagamin-net-tls` / `gitea-yagamin-net-tls`) |
 | 主要 Repo | `ics-corporate`、`wordpress`、`homelab-infra` (mirror)、その他個人 repo |
+
+> **外部公開の構成 (2026-06-16):** `gitea.yagamin.net` は tunnel ingress (`cloudflared/tunnel-config.yaml`、Host 保持・noTLSVerify) → RKE2 ingress-nginx の第2ホストルール (`gitea/values.yaml`) → `gitea-http:3000` という経路。CF Access app/policy は `scripts/cloudflared-ensure-access.sh` で studio.yagamin.net を踏襲。
+>
+> **ROOT_URL は内部のまま** (`gitea.home.yagamin.net`)。Gitea は ROOT_URL を1つしか持てず、clone URL や絶対リンクはこの内部ホスト名で描画される。よって `gitea.yagamin.net` は **CF Access 下での閲覧 / admin 用**であり、外部からの匿名 git-over-HTTP clone はそのままでは成立しない (git 操作を外部公開する場合は別途 CF Access service token + credential helper が必要)。
 
 ### Act Runner
 
