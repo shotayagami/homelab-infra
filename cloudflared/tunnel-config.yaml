@@ -101,6 +101,17 @@ ingress:
     originRequest:
       noTLSVerify: true
 
+  # --- Gitea (RKE2 ingress-nginx, CF Access protected) ---
+  # Public host for the internal Gitea (LAN host gitea.home.yagamin.net). Host is
+  # preserved so ingress-nginx matches the `gitea.yagamin.net` rule added to the
+  # gitea Helm release (gitea/values.yaml). CF Access (踏襲 studio policy) gates
+  # this host at the edge — see scripts/cloudflared-ensure-access.sh. Gitea's
+  # ROOT_URL stays internal by design (browsing/admin via Access, not anon git).
+  - hostname: gitea.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+
   # --- Catch-all (must be the last entry) ---
   - service: http_status:404
 

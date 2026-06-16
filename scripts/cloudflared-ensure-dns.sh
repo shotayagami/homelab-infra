@@ -44,6 +44,7 @@ DEFAULT_HOSTS=(
   dev-studio.yagamin.net
   deliver.yagamin.net
   dev-deliver.yagamin.net
+  gitea.yagamin.net
 )
 
 if [[ $# -gt 0 ]]; then
