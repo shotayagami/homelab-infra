@@ -75,6 +75,10 @@ ingress:
   className: nginx
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Gitea is a git server: large pushes (clone bundles, LFS, big commits) exceed
+    # nginx's default `proxy-body-size: 1m` and fail with HTTP 413. Raise it well
+    # above expected payloads. 512m mirrors the live hotfix that diagnosed this.
+    nginx.ingress.kubernetes.io/proxy-body-size: "512m"
   # `gitea.home.yagamin.net` is the LAN host (direct ingress). `gitea.yagamin.net`
   # is the public host reached through the Cloudflare Tunnel + CF Access (mirrors
   # the icstv tv/studio pattern: same backend, second host rule, Host preserved).
