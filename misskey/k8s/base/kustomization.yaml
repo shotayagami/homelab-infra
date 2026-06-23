@@ -6,3 +6,4 @@ resources:
   - postgres.yaml
   - meilisearch.yaml
   - networkpolicy-backends.yaml
+  - cloudflared.yaml

@@ -1,0 +1,95 @@
+---
+# Dedicated cloudflared connector for the yagamin.com tunnel (locally-managed).
+#
+# Separate from the shared "home-yagamin" tunnel (cloudflare ns) — this one
+# serves only yagamin.com and is self-contained (config + credentials in this
+# namespace), so no CF API push is needed.
+#
+# Routing mirrors the cluster's proven pattern: tunnel -> ingress-nginx
+# (192.168.11.80:443) with the Host header preserved (= yagamin.com), and
+# noTLSVerify because the origin cert (step-ca misskey-tls) is not publicly
+# trusted and real TLS is terminated at the Cloudflare edge.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-yagamin-config
+  labels:
+    app: cloudflared-yagamin
+data:
+  config.yaml: |
+    tunnel: 94c4072a-9776-4e08-9b1e-9dbf278a4fe7
+    credentials-file: /etc/cloudflared/credentials/credentials.json
+    metrics: 0.0.0.0:2000
+    no-autoupdate: true
+    ingress:
+      - hostname: yagamin.com
+        service: https://192.168.11.80:443
+        originRequest:
+          noTLSVerify: true
+      - service: http_status:404
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared-yagamin
+  labels:
+    app: cloudflared-yagamin
+    app.kubernetes.io/name: cloudflared-yagamin
+    app.kubernetes.io/part-of: misskey
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudflared-yagamin
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        app: cloudflared-yagamin
+        app.kubernetes.io/name: cloudflared-yagamin
+        app.kubernetes.io/part-of: misskey
+    spec:
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:2026.2.0
+          args:
+            - tunnel
+            - --config
+            - /etc/cloudflared/config/config.yaml
+            - run
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/cloudflared/config
+              readOnly: true
+            - name: credentials
+              mountPath: /etc/cloudflared/credentials
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: cloudflared-yagamin-config
+        - name: credentials
+          secret:
+            secretName: yagamin-tunnel-creds
