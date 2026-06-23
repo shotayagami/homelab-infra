@@ -6,4 +6,5 @@ resources:
   - postgres.yaml
   - meilisearch.yaml
   - networkpolicy-backends.yaml
+  - networkpolicy-smtp.yaml
   - cloudflared.yaml

@@ -1,0 +1,35 @@
+---
+# Supplemental egress for outbound SMTP (email verification / password reset).
+#
+# The chart's misskey-web-netpol only allows external egress on 80/443 (for
+# ActivityPub federation), which silently blocks SMTP submission ports and
+# makes Misskey's email send time out ("[email] Error: Connection timeout").
+# NetworkPolicy egress is additive across policies, so this adds the SMTP ports
+# for the web pod without modifying the vendored chart.
+#
+# 587 = STARTTLS submission, 465 = implicit TLS, 2525 = alt submission (Mailgun).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-smtp-egress
+spec:
+  podSelector:
+    matchLabels:
+      component: web
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 587
+        - protocol: TCP
+          port: 465
+        - protocol: TCP
+          port: 2525
