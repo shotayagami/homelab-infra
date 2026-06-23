@@ -1,0 +1,10 @@
+{{- include "misskey.validateRequired" . -}}
+{{- if .Values.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.instance.namespace }}
+  labels:
+    app: misskey
+    kubernetes.io/metadata.name: {{ .Values.instance.namespace }}
+{{- end }}

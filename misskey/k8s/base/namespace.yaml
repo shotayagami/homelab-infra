@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: misskey
+  labels:
+    app.kubernetes.io/name: misskey
+    app.kubernetes.io/part-of: misskey

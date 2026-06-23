@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.resourceNames.deployment }}
+  namespace: {{ .Values.instance.namespace }}
+  labels:
+    app: misskey
+    component: web
+spec:
+  replicas: {{ .Values.replicas.web }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "misskey.webSelector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "misskey.webSelector" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 30
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z {{ .Values.db.host }} {{ .Values.db.port }}; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+        - name: render-config
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              cp /config-template/default.yml /config/default.yml
+              # `__VAR__` プレースホルダを envFrom 経由で取得した secret 値に置換。
+              # `${VAR:-}` 形式で undefined 時は空文字に丸め、sed の `&` 等の
+              # メタ文字エスケープが不要になるよう変数展開を経由する。
+              sed -i "s|__DB_PASSWORD__|${DB_PASSWORD}|g" /config/default.yml
+              sed -i "s|__SETUP_PASSWORD__|${SETUP_PASSWORD}|g" /config/default.yml
+{{- if .Values.objectStorage.enabled }}
+              # オブジェクトストレージ (R2) のアクセスキー注入。
+              # secret (misskey-secret) の OBJECT_STORAGE_ACCESS_KEY / OBJECT_STORAGE_SECRET_KEY を
+              # envFrom 経由で取得し、DB_PASSWORD と同方式で sed 置換する。
+              sed -i "s|__OBJECT_STORAGE_ACCESS_KEY__|${OBJECT_STORAGE_ACCESS_KEY}|g" /config/default.yml
+              sed -i "s|__OBJECT_STORAGE_SECRET_KEY__|${OBJECT_STORAGE_SECRET_KEY}|g" /config/default.yml
+{{- if eq .Values.objectStorage.endpoint "__OBJECT_STORAGE_ENDPOINT__" }}
+              # endpoint(=account_id) も secret 注入する場合 (公開リポジトリで account_id を伏せる)。
+              # misskey-secret の OBJECT_STORAGE_ENDPOINT を sed 置換。
+              sed -i "s|__OBJECT_STORAGE_ENDPOINT__|${OBJECT_STORAGE_ENDPOINT}|g" /config/default.yml
+{{- end }}
+{{- end }}
+{{- if and .Values.meilisearch.enabled .Values.meilisearch.apiKeyFromSecret }}
+              # Meilisearch master key 注入。secret (misskey-secret) の MEILISEARCH_API_KEY を
+              # envFrom 経由で取得し、DB_PASSWORD と同方式で sed 置換する (values 平文回避)。
+              sed -i "s|__MEILISEARCH_API_KEY__|${MEILISEARCH_API_KEY}|g" /config/default.yml
+{{- end }}
+{{- if .Values.sentry.enabled }}
+              # Sentry DSN 注入。secret 未定義時は空文字 (Misskey 側で初期化エラー回避のため
+              # configmap に空 dsn を入れる代わりに、secret 自体を未設定にして
+              # sentry.enabled=false で無効化することを推奨)。
+              sed -i "s|__SENTRY_BACKEND_DSN__|${SENTRY_BACKEND_DSN:-}|g" /config/default.yml
+              sed -i "s|__SENTRY_FRONTEND_DSN__|${SENTRY_FRONTEND_DSN:-}|g" /config/default.yml
+{{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.db.passwordSecret.name }}
+            {{- if ne .Values.setupPasswordSecret.name .Values.db.passwordSecret.name }}
+            - secretRef:
+                name: {{ .Values.setupPasswordSecret.name }}
+            {{- end }}
+{{- if .Values.sentry.enabled }}
+            {{- $sentrySecrets := list .Values.sentry.backend.dsnSecret.name .Values.sentry.frontend.dsnSecret.name | uniq }}
+            {{- range $sentrySecrets }}
+            {{- if and (ne . $.Values.db.passwordSecret.name) (ne . $.Values.setupPasswordSecret.name) }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+            {{- end }}
+{{- end }}
+          volumeMounts:
+            - name: config-template
+              mountPath: /config-template
+            - name: config
+              mountPath: /config
+      containers:
+        - name: misskey
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /
+              port: 3000
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
+          volumeMounts:
+            - name: config
+              mountPath: /misskey/.config
+            - name: files
+              mountPath: /misskey/files
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+      volumes:
+        - name: config-template
+          configMap:
+            name: {{ .Values.resourceNames.configMap }}
+        - name: config
+          emptyDir: {}
+        - name: files
+{{- if .Values.objectStorage.enabled }}
+          # オブジェクトストレージ利用時はローカル PVC 不要 (内部/一時用に emptyDir)
+          emptyDir: {}
+{{- else }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.resourceNames.pvc }}
+{{- end }}

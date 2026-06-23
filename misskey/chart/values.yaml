@@ -1,0 +1,174 @@
+# Misskey インスタンス Chart デフォルト値
+# 各インスタンスは instances/<site>.yaml で必須項目を上書きする
+
+instance:
+  # インスタンス識別子 (lower-case, alnum + hyphen)
+  name: ""        # 必須 (例: yagamin)
+  # K8s Namespace 名 (既存 yagamin との互換のため instance.name と独立)
+  namespace: ""   # 必須 (例: misskey)
+  # 公開 URL (https:// 付き)
+  url: ""         # 必須 (例: https://yagamin.com)
+  # Ingress ホスト名 (https:// なし)
+  host: ""        # 必須 (例: yagamin.com)
+
+image:
+  repository: misskey/misskey
+  tag: "2026.5.0"
+  pullPolicy: IfNotPresent
+
+replicas:
+  web: 2
+
+db:
+  host: postgresql-hl.databases.svc.cluster.local
+  port: 5432
+  name: ""       # 必須 (例: misskey)
+  user: ""       # 必須 (例: misskey)
+  passwordSecret:
+    name: misskey-secret
+    key: DB_PASSWORD
+
+setupPasswordSecret:
+  name: misskey-secret
+  key: SETUP_PASSWORD
+
+meilisearch:
+  enabled: true
+  host: meilisearch.meilisearch.svc.cluster.local
+  port: 7700
+  # apiKeyFromSecret=false: apiKey を values から平文で configmap に描画 (既存挙動)。
+  # apiKeyFromSecret=true : configmap には __MEILISEARCH_API_KEY__ を置き、deployment の
+  #   initContainer が secret (db.passwordSecret.name) の MEILISEARCH_API_KEY を sed 注入。
+  #   master key を values(git) に平文で置かずに済む。
+  apiKeyFromSecret: false
+  apiKey: ""     # apiKeyFromSecret=false 時のみ使用 (既存値を再利用)
+  ssl: false
+  index: ""      # 必須 (例: yagamin-com)
+
+redis:
+  image: redis:7-alpine
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+storage:
+  files:
+    storageClass: longhorn
+    accessMode: ReadWriteMany
+    size: 10Gi
+
+# オブジェクトストレージ (S3 互換 / Cloudflare R2 等)。
+# enabled=false: 従来どおりローカル PVC (storage.files) にアップロードを保存 (既存挙動)。
+# enabled=true : PVC を作成せず (pvc.yaml)、files マウントは emptyDir になり、
+#                アップロードは objectStorage に保存される (RWX 不要)。
+# ⚠️ 既存インスタンスで false→true に切り替えると ArgoCD prune で既存 PVC が削除される。
+#    切替前に PVC 内メディアを object storage へ移送すること (データ消失防止)。
+# accessKey / secretKey は db.passwordSecret.name と同じ secret (既定 misskey-secret) の
+# OBJECT_STORAGE_ACCESS_KEY / OBJECT_STORAGE_SECRET_KEY キーから initContainer の sed で
+# 注入する (envFrom 済のため secret 追加は不要。キー名は deployment.yaml と固定契約)。
+objectStorage:
+  enabled: false
+  baseUrl: ""              # 公開 URL (例: https://media.yagamin.com)
+  bucket: ""               # 例: misskey-yagamin
+  prefix: ""               # 例: files (空可)
+  endpoint: ""             # 例: <account_id>.r2.cloudflarestorage.com
+  region: "auto"           # R2 は auto
+  useSSL: true
+  s3ForcePathStyle: true   # R2 はパススタイル推奨
+  setPublicRead: false     # R2 は公開バケット+カスタムドメインで公開
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1536Mi
+
+misskeyConfig:
+  id: aidx
+  clusterLimit: 1
+  proxyRemoteFiles: true
+  maxFileSize: 262144000
+  proxyBypassHosts:
+    - api.deepl.com
+    - api-free.deepl.com
+    - www.recaptcha.net
+    - hcaptcha.com
+    - challenges.cloudflare.com
+
+# Sentry エラートラッキング (Misskey ネイティブの sentryForBackend / sentryForFrontend)。
+# DSN は `__SENTRY_BACKEND_DSN__` / `__SENTRY_FRONTEND_DSN__` プレースホルダで
+# secret から環境変数経由で注入される (deployment の initContainer で sed 置換)。
+# 各 secret キーが空文字なら Sentry 初期化はスキップされる (configmap も生成しない)。
+sentry:
+  enabled: false
+  # バックエンド (Node.js) 側の Sentry
+  backend:
+    enableNodeProfiling: true
+    # DSN は secret から取得する。マニフェスト直書きは避ける
+    dsnSecret:
+      name: misskey-secret
+      key: SENTRY_BACKEND_DSN
+  # フロントエンド (ブラウザ) 側の Sentry
+  # vue/browserTracing/replay 各 integration をデフォルトで有効化
+  frontend:
+    vueIntegration:
+      trackComponents: true
+    browserTracing: true
+    replay: true
+    dsnSecret:
+      name: misskey-secret
+      key: SENTRY_FRONTEND_DSN
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  cpuAverageValue: 200m
+  scaleUp:
+    stabilizationWindowSeconds: 30
+    podsValue: 2
+    periodSeconds: 60
+  scaleDown:
+    stabilizationWindowSeconds: 600
+    podsValue: 1
+    periodSeconds: 300
+
+ingress:
+  enabled: true
+  className: nginx
+  tlsSecretName: ""              # 必須 (例: misskey-tls)
+  clusterIssuer: letsencrypt-prod
+  proxyBodySize: "256m"
+  proxyReadTimeout: "3600"
+  proxySendTimeout: "3600"
+  proxyConnectTimeout: "10"
+  sslRedirect: "false"
+  upstreamHashBy: "$remote_addr"
+
+networkPolicy:
+  enabled: true
+  ingressNamespaceLabel: ingress-nginx
+  databasesNamespaceLabel: databases
+  meilisearchNamespaceLabel: meilisearch
+
+# リソース名 (既存 yagamin との互換のためオーバーライド可能)
+resourceNames:
+  configMap: misskey-config
+  deployment: misskey
+  service: misskey-service
+  redisDeployment: misskey-redis
+  redisService: misskey-redis
+  pvc: misskey-files-rwx
+  hpa: misskey
+  ingress: misskey-ingress
+
+# Namespace リソースを Chart で作成するか
+# ArgoCD ApplicationSet 経由デプロイ時は CreateNamespace=true syncOption に任せるため false 推奨
+# helm install で直接デプロイする場合は true にする
+createNamespace: false

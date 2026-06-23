@@ -1,0 +1,48 @@
+---
+# ArgoCD Application for the Misskey backend stack (misskey-postgres + meilisearch).
+#
+# Source repo: homelab-infra on GitHub (Public) — same rationale as gitea-infra:
+# we do NOT use the internal Gitea as the source, to avoid a circular
+# dependency where the stack cannot sync while Gitea is degraded.
+#
+# This stack is the platform "土台" for the yagamin.com Misskey migration.
+# The Misskey application itself (Helm chart) + Redis are deployed separately
+# once the migration-source chart is received (see misskey/README.md).
+#
+# Apply this manifest once via `kubectl apply` after the PR merges to main.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: misskey-infra
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shotayagami/homelab-infra.git
+    targetRevision: main
+    path: misskey/k8s/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: misskey
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates/0/apiVersion
+        - /spec/volumeClaimTemplates/0/kind

@@ -1,0 +1,33 @@
+Misskey instance "{{ .Values.instance.name }}" deployed.
+
+  URL:        {{ .Values.instance.url }}
+  Namespace:  {{ .Values.instance.namespace }}
+  DB:         {{ .Values.db.name }} @ {{ .Values.db.host }}
+  Redis:      {{ .Values.resourceNames.redisService }}.{{ .Values.instance.namespace }}.svc.cluster.local
+{{- if .Values.meilisearch.enabled }}
+  Search:     meilisearch index "{{ .Values.meilisearch.index }}"
+{{- end }}
+{{- if .Values.objectStorage.enabled }}
+  Files:      object storage (S3/R2) bucket "{{ .Values.objectStorage.bucket }}" @ {{ .Values.objectStorage.endpoint }}
+{{- else }}
+  Files:      local PVC "{{ .Values.resourceNames.pvc }}" ({{ .Values.storage.files.size }} {{ .Values.storage.files.accessMode }})
+{{- end }}
+
+新サイト追加手順は k8s/misskey/README.md を参照。
+
+{{- if and .Values.meilisearch.enabled .Values.meilisearch.apiKeyFromSecret }}
+
+ℹ️ Meilisearch apiKey は secret "{{ .Values.db.passwordSecret.name }}" の MEILISEARCH_API_KEY から
+   注入されます。Meilisearch の MEILI_MASTER_KEY と同一値を投入してください。
+{{- end }}
+{{- if .Values.objectStorage.enabled }}
+
+⚠️ objectStorage 有効化に関する注意:
+  - アップロードは {{ .Values.objectStorage.bucket }} に保存され、ローカル PVC は作成されません。
+  - 受け入れ側で secret "{{ .Values.db.passwordSecret.name }}" に
+    OBJECT_STORAGE_ACCESS_KEY / OBJECT_STORAGE_SECRET_KEY を投入してください
+    (未投入だと空キーでアップロードが失敗します)。
+  - 既存インスタンスで objectStorage を後から有効化する場合、ArgoCD prune により
+    既存 PVC "{{ .Values.resourceNames.pvc }}" が削除されます。先に PVC 内メディアを
+    object storage へ移送してから切り替えてください (データ消失防止)。
+{{- end }}

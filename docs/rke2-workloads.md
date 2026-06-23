@@ -156,7 +156,35 @@ GitOps エンジン。Gitea repo を source of truth として、`ics`、`monito
 
 ---
 
-## 7. ネットワーク・公開経路
+## 7. Misskey (yagamin.com) — 移設土台
+
+別 k8s 環境からの ActivityPub 連合 SNS `yagamin.com` 移設プロジェクト。manifest は本リポジトリ
+[misskey/](../misskey/) で管理。本番のレプリカは **1 固定** (HPA 不使用)、アップロードファイルは
+Longhorn RWX ではなく **Cloudflare R2 (S3 互換)** に保存する方針。
+
+現状はチャート非依存の **依存スタック (土台) のみ**を先行構築する段階。
+
+| 項目 | 値 |
+|---|---|
+| 外部 URL | `https://yagamin.com` (移設後も不変、連合維持) |
+| K8s namespace | `misskey` |
+| デプロイ管理 | Kustomize + ArgoCD Application `misskey-infra` (source = GitHub homelab-infra、循環依存回避) |
+| Database | **PostgreSQL 18 (Debian)** `misskey-postgres` (StatefulSet, Longhorn RWO 10Gi)。移行元 18.3 とメジャー一致、locale `en_US.UTF-8` 揃え (alpine 不可) |
+| 全文検索 | **Meilisearch v1.41.0** (StatefulSet, Longhorn RWO 5Gi、インデックスは PG から再構築) |
+| SealedSecrets | `misskey-db` (DB 認証)、`misskey-meilisearch` (master key) |
+| 公開経路 (予定) | `yagamin.com` 専用 Cloudflare Tunnel を新設し CNAME 切替 (カットオーバー当日) |
+
+### 後続フェーズ (受領待ち)
+
+- **Misskey 本体**: 移行元 Helm chart (R2/NetworkPolicy 対応版) を ArgoCD で参照。`db.host` / `meilisearch.host` を本土台の Service に差し替え。受け渡しは tarball vendoring
+- **Redis**: 移行元チャートに**同梱** (`misskey-redis`、揮発)。本土台側の用意は不要 (2026-06-23 確定)
+- **R2 / 内部 TLS**: バケット `misskey-yagamin` + `media.yagamin.com`、ingress `misskey-tls` は cert-manager 発行。`misskey-secret` に R2 キー + Meili apiKey を SealedSecret 化
+
+詳細は [misskey/README.md](../misskey/README.md) を一次資料とする。
+
+---
+
+## 8. ネットワーク・公開経路
 
 ### Ingress / cert-manager
 

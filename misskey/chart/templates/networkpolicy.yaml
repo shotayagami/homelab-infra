@@ -1,0 +1,99 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ .Values.instance.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: misskey-web-netpol
+  namespace: {{ .Values.instance.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      component: web
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressNamespaceLabel }}
+      ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    # Redis (同 namespace 内)
+    - to:
+        - podSelector:
+            matchLabels:
+              component: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # PostgreSQL (databases namespace)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.databasesNamespaceLabel }}
+      ports:
+        - protocol: TCP
+          port: 5432
+{{- if .Values.meilisearch.enabled }}
+    # Meilisearch (meilisearch namespace)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.meilisearchNamespaceLabel }}
+      ports:
+        - protocol: TCP
+          port: 7700
+{{- end }}
+    # DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 外部通信 (ActivityPub 連合、リモートメディア取得)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: misskey-redis-netpol
+  namespace: {{ .Values.instance.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      component: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              component: web
+      ports:
+        - protocol: TCP
+          port: 6379
+{{- end }}

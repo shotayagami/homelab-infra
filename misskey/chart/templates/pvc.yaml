@@ -1,0 +1,16 @@
+{{- if not .Values.objectStorage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.resourceNames.pvc }}
+  namespace: {{ .Values.instance.namespace }}
+  labels:
+    app: misskey
+spec:
+  accessModes:
+    - {{ .Values.storage.files.accessMode }}
+  storageClassName: {{ .Values.storage.files.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.files.size }}
+{{- end }}

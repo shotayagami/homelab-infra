@@ -1,0 +1,51 @@
+---
+# ArgoCD Application for the Misskey app itself (vendored Helm chart).
+#
+# Separate from `misskey-infra` (the PG18 + Meilisearch platform stack):
+# this one deploys the Misskey web/redis workload from the vendored chart
+# at misskey/chart, parameterized by misskey/values/yagamin.yaml.
+#
+# Multi-source keeps the chart pristine (misskey/chart) while the instance
+# values live separately (misskey/values/yagamin.yaml), referenced via $values.
+#
+# ⚠️ Apply this manifest only AFTER:
+#   1. the platform stack (misskey-infra) is healthy (PG18 + Meilisearch up), and
+#   2. misskey-secret carries OBJECT_STORAGE_ACCESS_KEY / OBJECT_STORAGE_SECRET_KEY
+#      and values' objectStorage.endpoint has the real R2 account_id (R2 phase).
+# Until then the web pod cannot reach R2 and will not come up cleanly.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: misskey
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/shotayagami/homelab-infra.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/shotayagami/homelab-infra.git
+      targetRevision: main
+      path: misskey/chart
+      helm:
+        valueFiles:
+          - $values/misskey/values/yagamin.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: misskey
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m

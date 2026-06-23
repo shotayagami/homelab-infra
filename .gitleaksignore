@@ -11,3 +11,6 @@
 gitea/k8s/overlays/production/sealed-secrets/gitea-redis.yaml:generic-api-key:9
 gitea/k8s/overlays/production/sealed-secrets/gitea-db.yaml:generic-api-key:10
 cloudflared/k8s/overlays/production/sealed-secrets/tunnel-credentials.yaml:generic-api-key:9
+misskey/k8s/overlays/production/sealed-secrets/misskey-secret.yaml:generic-api-key:9
+misskey/k8s/overlays/production/sealed-secrets/misskey-secret.yaml:generic-api-key:11
+misskey/k8s/overlays/production/sealed-secrets/misskey-secret.yaml:generic-api-key:14
