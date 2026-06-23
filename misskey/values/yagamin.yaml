@@ -6,7 +6,7 @@
 #  - networkPolicy.ingressNamespaceLabel: ingress-nginx → kube-system
 #    (本環境の nginx ingress は kube-system で稼働。chart default のままだと
 #     default-deny-ingress で web pod への流入が全遮断される)
-#  - ingress.clusterIssuer: step-ca-issuer (内部CA、Tunnel 背後前提)
+#  - ingress.clusterIssuer: selfsigned-issuer (Tunnel 背後で origin 証明書は信頼不要)
 #  - objectStorage: 現環境の R2 設定を流用 (bucket yagamincom / prefix misskey /
 #    files.yagamin.com)。endpoint(account_id) は公開 repo 非露出のため secret 注入
 # secret 契約: db.passwordSecret / setupPasswordSecret は chart default の
@@ -64,9 +64,11 @@ hpa:
 
 ingress:
   tlsSecretName: misskey-tls
-  # 内部 CA (step-ca)。letsencrypt-prod の DNS-01 solver は dnsZones=[yagamin.net]
-  # のみで yagamin.com を発行できないため、Tunnel 背後(noTLSVerify)前提で内部CAを使う。
-  clusterIssuer: step-ca-issuer
+  # selfsigned: Tunnel(noTLSVerify)背後なので origin 証明書は公開信頼不要。
+  # step-ca/letsencrypt は ACME チャレンジ検証が要るが、公開ドメイン yagamin.com を
+  # 内部CAで HTTP-01 検証するのは hairpin で不成立 (solver も default-deny に阻まれる)。
+  # selfsigned-issuer は即時発行 (チャレンジ不要) でループを起こさない。
+  clusterIssuer: selfsigned-issuer
 
 networkPolicy:
   # ★ 本環境の nginx ingress は kube-system namespace で稼働

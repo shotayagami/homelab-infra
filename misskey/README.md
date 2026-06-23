@@ -105,9 +105,10 @@ kubectl apply -f misskey/k8s/argocd/application-misskey.yaml   # misskey
 
 1. 土台 (misskey-infra) が Healthy (PG18 + Meilisearch 起動)
 2. R2: **現環境の設定を流用済み**（キー封緘済み・endpoint secret 注入済み・values 反映済み）。R2 は外部共有のため**ファイル移送不要**
-3. **TLS**: `ingress.clusterIssuer: step-ca-issuer` (内部CA) を採用。letsencrypt-prod の DNS-01 solver は
-   `dnsZones: [yagamin.net]` のみで yagamin.com を発行できないため。Cloudflare Tunnel 背後 (noTLSVerify)
-   なら origin 証明書は公開信頼不要。
+3. **TLS**: `ingress.clusterIssuer: selfsigned-issuer`。Cloudflare Tunnel 背後 (noTLSVerify) なので origin
+   証明書は公開信頼不要。step-ca/letsencrypt は ACME チャレンジ検証が要り、公開ドメイン yagamin.com を
+   内部CAで HTTP-01 検証するのは hairpin で不成立 (solver も chart の default-deny に阻まれる) → selfsigned
+   が即時発行でループしない。
 4. **Tunnel**: `yagamin.com` 専用 Tunnel + 専用 cloudflared connector（認証 JSON 待ち）
 
 ## 後続フェーズ
@@ -115,6 +116,6 @@ kubectl apply -f misskey/k8s/argocd/application-misskey.yaml   # misskey
 | フェーズ | 内容 | 状態 |
 |---|---|---|
 | R2 | 現環境設定を流用 (bucket `yagamincom` / prefix `misskey` / files.yagamin.com)。既存キー封緘済み・endpoint secret 注入済み。**ファイル移送不要** | 完了 |
-| TLS | `step-ca-issuer` (内部CA) を採用済み (values 反映済) | 完了 |
+| TLS | `selfsigned-issuer` (Tunnel 背後で信頼不要、ACME不要) | 完了 |
 | Tunnel | `yagamin.com` 専用 Cloudflare Tunnel 新設 + 専用 cloudflared connector → CNAME 切替 (カットオーバー当日) | 認証 JSON 待ち |
 | カットオーバー | 移行元 書き込み停止 → 最終 `pg_dump -Fc` → restore → Meilisearch 再インデックス → CNAME 切替 | 日程調整中 |
