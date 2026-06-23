@@ -50,8 +50,11 @@ spec:
               value: production
             - name: MEILI_NO_ANALYTICS
               value: "true"
+            # Use a subdir, not the PVC mount root: Longhorn (ext4) volumes have
+            # a lost+found at the root, which makes Meilisearch fail with
+            # "failed to infer the version of the database" on a fresh volume.
             - name: MEILI_DB_PATH
-              value: /meili_data
+              value: /meili_data/data
             # Same value the Misskey chart injects as meilisearch.apiKey
             # (single source of truth: misskey-secret.MEILISEARCH_API_KEY).
             - name: MEILI_MASTER_KEY
