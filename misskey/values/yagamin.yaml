@@ -20,6 +20,11 @@ instance:
   url: https://yagamin.com
   host: yagamin.com
 
+# 本体バージョン (chart default 2026.5.0 を上書き)。
+# 2026.6.0 は破壊的変更なし・手動手順なしの通常マイナー (CHANGELOG 確認済)。
+image:
+  tag: "2026.6.0"
+
 db:
   # 専用 PostgreSQL 18 (misskey namespace 内、土台 misskey/k8s)
   host: misskey-postgres.misskey.svc.cluster.local
