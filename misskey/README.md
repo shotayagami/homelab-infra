@@ -14,7 +14,7 @@
 | Namespace | `misskey` |
 | Database | **PostgreSQL 18 (Debian)** `misskey-postgres` — locale `en_US.UTF-8` で移行元と一致 (`k8s/base/postgres.yaml`) |
 | 全文検索 | **Meilisearch v1.41.0** `meilisearch` (`k8s/base/meilisearch.yaml`、インデックスは PG から再構築) |
-| 本体 | **Misskey 2026.5.0** (vendored chart `chart/`、values `values/yagamin.yaml`) + 同梱 Redis (揮発) |
+| 本体 | **Misskey 2026.6.0** (vendored chart `chart/` appVersion 2026.5.0、image tag を `values/yagamin.yaml` で 2026.6.0 に上書き) + 同梱 Redis (揮発) |
 | Secret | 単一 **`misskey-secret`** (SealedSecret) — 土台と本体で共有 (single source of truth) |
 | 管理 | Kustomize (土台) + Helm/ArgoCD (本体)。ArgoCD App `misskey-infra` (土台) / `misskey` (本体) |
 
