@@ -1,0 +1,110 @@
+---
+# Dedicated PostgreSQL 18 for the Misskey (yagamin.com) migration.
+#
+# Deliberately NOT colocated on the shared pg-db (LXC 106, icsdb-only) nor on
+# any other workload's PG. Same pattern as gitea-postgres / crossing-postgres:
+# StatefulSet + headless Service + SealedSecret + Longhorn RWO PVC.
+#
+# Source DB is PostgreSQL 18.3; major version is matched for a clean
+# `pg_restore`. The misskey DB is restored into the `misskey` database that
+# initdb creates from POSTGRES_DB below.
+#
+# Locale (confirmed with source): server_encoding=UTF8, lc_collate=en_US.UTF-8,
+# lc_ctype=en_US.UTF-8. This requires the Debian-based `postgres:18` image —
+# the alpine variant uses musl and only ships C / C.UTF-8 / POSIX, so creating
+# a DB with LC_COLLATE='en_US.UTF-8' fails there ("invalid locale name").
+# POSTGRES_INITDB_ARGS pins the cluster locale so POSTGRES_DB=misskey is created
+# with en_US.UTF-8 up front, matching the dump (no post-restore recreate needed).
+apiVersion: v1
+kind: Service
+metadata:
+  name: misskey-postgres
+  labels:
+    app: misskey-postgres
+spec:
+  clusterIP: None
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: 5432
+  selector:
+    app: misskey-postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: misskey-postgres
+  labels:
+    app.kubernetes.io/name: misskey-postgres
+    app.kubernetes.io/part-of: misskey
+spec:
+  serviceName: misskey-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: misskey-postgres
+  template:
+    metadata:
+      labels:
+        app: misskey-postgres
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:18
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: pg
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: misskey-secret
+                  key: DB_NAME
+            # Match the source DB locale (en_US.UTF-8) so pg_restore is clean.
+            # Requires the Debian image (alpine/musl lacks this locale).
+            - name: POSTGRES_INITDB_ARGS
+              value: "--encoding=UTF8 --locale=en_US.UTF-8"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: misskey-secret
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: misskey-secret
+                  key: DB_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            exec:
+              command: ['pg_isready', '-U', 'misskey', '-d', 'misskey']
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ['pg_isready', '-U', 'misskey', '-d', 'misskey']
+            initialDelaySeconds: 30
+            periodSeconds: 20
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 10Gi

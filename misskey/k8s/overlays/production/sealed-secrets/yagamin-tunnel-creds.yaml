@@ -1,0 +1,13 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: yagamin-tunnel-creds
+  namespace: misskey
+spec:
+  encryptedData:
+    credentials.json: AgBaAu15pM6I/wCExykkMCXoXj3mN0H3Puj3snUlQa2Rkm/SFzKAS8h7f/eckF9xnH0K0mW+ORt2E/Z0jFmJO9EEe7yeX8+VY756WzX8Qy18AOrmdfCV8F3HetjCVV9hpP584KzRt/vK6I54zRxmB0KISulqgmL+0/fmYQIHd1sopQntxG9SX09+ZF1BZpQKPHSwVh4O+u1OmuF9odwRPmYoeTMCYRGB5AE0g/dmfs8i+xb1bmniL2lFc1/7h/novvli7tswK1d15UGsMz0RMhrgZSfDKiDD8BtYYlQ+mvcylQfS+PXxe3E4ZtsBQLiT5deUDl48ov2p3fNUpCMIcY3luSF60Ru/GfIGtBD0qsKny23uTgbaleRqzhKPJdFK6YMe0+gn3C8fTXOKrZJQmGQqOZBXbOnrv+rYsdAQgGK/BI7uxuvPDGQFDze8AfZa2lCvWu+JhovTuFZohAKynCuqbkWnRtH1g17JgAQccU1GO2kJqnL6YqpOaKRY+Ma4z4QBIETZX1NkYNQbR22xTtq4CYJQ01qupuNWMX9pD7o+md3r+xgeFoWAXHhut3XyDVIc9UJaJAS79PPPGi47qpsCK5+j8i4MPZAPZHtJkBJu2tNzg/2ry5OuEpSQ8DMz/02pxxSrboxMCdocYLwAGkk8u9usmpAEurnE/TIwz46zEOFq3pWt2WnkUqM8rJXD6cHzfkhcwZFKyn+vql29c1XyCkeGUIGohlc9py8Uff2tWL9yXqRyFOZ8w3q9Ou3BAptdu6LXyxs93rfk9iA4ESyBkxfRaRYgu7XFPxR7LANXCvvS+MYCmCV1u24B3fp0UW1VoPDUlY6J1/CguClj0UPWmmT/Mh7+DFUKH+gLfOes8HspNSw4tdVW4PCHxr9vwTXG6wA22gUf+s4GWQmwNaRKs7r0q8/te7wApieK/HyV
+  template:
+    metadata:
+      name: yagamin-tunnel-creds
+      namespace: misskey

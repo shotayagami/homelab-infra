@@ -1,0 +1,92 @@
+---
+# Meilisearch for Misskey full-text search.
+#
+# Index data is NOT migrated: the search index is rebuilt from PostgreSQL via
+# Misskey's control panel after cutover. The PVC is therefore "rebuildable"
+# (RWO, Longhorn). The master key is held in the misskey-meilisearch
+# SealedSecret and MUST equal Misskey's `meilisearch.apiKey`.
+apiVersion: v1
+kind: Service
+metadata:
+  name: meilisearch
+  labels:
+    app: meilisearch
+spec:
+  clusterIP: None
+  ports:
+    - name: http
+      port: 7700
+      targetPort: 7700
+  selector:
+    app: meilisearch
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: meilisearch
+  labels:
+    app.kubernetes.io/name: meilisearch
+    app.kubernetes.io/part-of: misskey
+spec:
+  serviceName: meilisearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meilisearch
+  template:
+    metadata:
+      labels:
+        app: meilisearch
+    spec:
+      containers:
+        - name: meilisearch
+          image: getmeili/meilisearch:v1.41.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7700
+          env:
+            - name: MEILI_ENV
+              value: production
+            - name: MEILI_NO_ANALYTICS
+              value: "true"
+            - name: MEILI_DB_PATH
+              value: /meili_data
+            # Same value the Misskey chart injects as meilisearch.apiKey
+            # (single source of truth: misskey-secret.MEILISEARCH_API_KEY).
+            - name: MEILI_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: misskey-secret
+                  key: MEILISEARCH_API_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /meili_data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 7700
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7700
+            initialDelaySeconds: 30
+            periodSeconds: 20
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 5Gi

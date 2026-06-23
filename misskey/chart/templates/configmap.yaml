@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.resourceNames.configMap }}
+  namespace: {{ .Values.instance.namespace }}
+data:
+  default.yml: |
+    url: {{ .Values.instance.url }}
+    port: 3000
+
+    db:
+      host: {{ .Values.db.host }}
+      port: {{ .Values.db.port }}
+      db: {{ .Values.db.name }}
+      user: {{ .Values.db.user }}
+      pass: __DB_PASSWORD__
+
+    redis:
+      host: {{ .Values.resourceNames.redisService }}
+      port: 6379
+
+    id: '{{ .Values.misskeyConfig.id }}'
+
+    setupPassword: __SETUP_PASSWORD__
+
+    proxyBypassHosts:
+{{- range .Values.misskeyConfig.proxyBypassHosts }}
+      - {{ . }}
+{{- end }}
+
+{{- if .Values.meilisearch.enabled }}
+
+    fulltextSearch:
+      provider: meilisearch
+
+    meilisearch:
+      host: {{ .Values.meilisearch.host }}
+      port: {{ .Values.meilisearch.port }}
+{{- if .Values.meilisearch.apiKeyFromSecret }}
+      apiKey: '__MEILISEARCH_API_KEY__'
+{{- else }}
+      apiKey: '{{ .Values.meilisearch.apiKey }}'
+{{- end }}
+      ssl: {{ .Values.meilisearch.ssl }}
+      index: '{{ .Values.meilisearch.index }}'
+{{- end }}
+
+    clusterLimit: {{ .Values.misskeyConfig.clusterLimit }}
+
+    proxyRemoteFiles: {{ .Values.misskeyConfig.proxyRemoteFiles }}
+    maxFileSize: {{ int64 .Values.misskeyConfig.maxFileSize }}
+
+{{- if .Values.objectStorage.enabled }}
+
+    # オブジェクトストレージ (S3 互換 / Cloudflare R2)。
+    # accessKey / secretKey は initContainer の sed で secret から注入される。
+    useObjectStorage: true
+    objectStorage:
+      baseUrl: {{ .Values.objectStorage.baseUrl }}
+      bucket: {{ .Values.objectStorage.bucket }}
+      prefix: '{{ .Values.objectStorage.prefix }}'
+      endpoint: {{ .Values.objectStorage.endpoint }}
+      region: {{ .Values.objectStorage.region }}
+      useSSL: {{ .Values.objectStorage.useSSL }}
+      accessKey: __OBJECT_STORAGE_ACCESS_KEY__
+      secretKey: __OBJECT_STORAGE_SECRET_KEY__
+      s3ForcePathStyle: {{ .Values.objectStorage.s3ForcePathStyle }}
+      setPublicRead: {{ .Values.objectStorage.setPublicRead }}
+{{- end }}
+
+{{- if .Values.sentry.enabled }}
+
+    # Sentry エラートラッキング (DSN は initContainer の sed で secret から注入される)。
+    sentryForBackend:
+      enableNodeProfiling: {{ .Values.sentry.backend.enableNodeProfiling }}
+      options:
+        dsn: '__SENTRY_BACKEND_DSN__'
+
+    sentryForFrontend:
+{{- if .Values.sentry.frontend.vueIntegration }}
+      vueIntegration:
+        tracingOptions:
+          trackComponents: {{ .Values.sentry.frontend.vueIntegration.trackComponents }}
+{{- end }}
+{{- if .Values.sentry.frontend.browserTracing }}
+      browserTracingIntegration: {}
+{{- end }}
+{{- if .Values.sentry.frontend.replay }}
+      replayIntegration: {}
+{{- end }}
+      options:
+        dsn: '__SENTRY_FRONTEND_DSN__'
+{{- end }}

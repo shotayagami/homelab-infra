@@ -1,0 +1,47 @@
+---
+# The Misskey chart ships a `default-deny-ingress` NetworkPolicy with
+# podSelector:{} that selects ALL pods in the misskey namespace — including
+# this stack's misskey-postgres and meilisearch. The chart only adds ingress
+# allowances for its own web/redis pods (its PG/Meili are assumed to live in
+# other namespaces). Because we deliberately colocate PG/Meili in `misskey`,
+# we must add the matching ingress allowances here, or Misskey cannot reach
+# its own DB / search once the chart's default-deny is active.
+#
+# Source pod label `component: web` is defined by the chart's webSelector.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-postgres
+spec:
+  podSelector:
+    matchLabels:
+      app: misskey-postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              component: web
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-meilisearch
+spec:
+  podSelector:
+    matchLabels:
+      app: meilisearch
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              component: web
+      ports:
+        - protocol: TCP
+          port: 7700

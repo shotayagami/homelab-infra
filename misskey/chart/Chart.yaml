@@ -1,0 +1,8 @@
+apiVersion: v2
+name: misskey
+description: Misskey instance chart for ICS multi-instance hosting
+type: application
+version: 0.1.0
+appVersion: "2026.5.0"
+maintainers:
+  - name: ICS Infrastructure
