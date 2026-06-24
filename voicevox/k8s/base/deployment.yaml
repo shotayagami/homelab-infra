@@ -42,10 +42,12 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 300Mi
+              memory: 512Mi
             limits:
               cpu: "2"
-              memory: 2Gi
+              # 長文(天気予報の今日/明日ナレ ~60s)の合成でピークが 2Gi を超え OOMKilled に
+              # なるため 4Gi へ。天気サブシステム側も合成を文単位に分割しピークを抑える。
+              memory: 4Gi
           readinessProbe:
             httpGet:
               path: /version
