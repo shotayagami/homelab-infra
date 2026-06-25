@@ -86,6 +86,21 @@ ingress:
     originRequest:
       noTLSVerify: true
 
+  # --- ICS-TV ops (放送コンソール / RKE2 ingress-nginx, CF Access protected) ---
+  # studio から分離した運行オペレータ向け UI (@icstv/ops)。studio / dev-studio と同じく
+  # 関係者限定で、CF Access ポリシーは studio.yagamin.net を踏襲する
+  # (scripts/cloudflared-ensure-access.sh)。ops = 本番 (icstv ns)、dev-ops = 開発 (icstv-dev ns)。
+  # NOTE: 2026-06-25 時点でバックエンド (RKE2 ingress 側の ops host ルール) は構築中のため、
+  # 整うまでは認証通過後に ingress-nginx の 404 が返る (エッジ層を先行整備した状態)。
+  - hostname: ops.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+  - hostname: dev-ops.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+
   # --- ICS-TV deliver (業者向け納品ポータル / RKE2 ingress-nginx) ---
   # 外部の配信業者が素材を納品するための UI。studio.* / dev-studio.* と違い
   # **CF Access は付けない** — 業者がトンネル経由で到達できる必要があり、Access を
@@ -111,6 +126,13 @@ ingress:
     service: https://192.168.11.80:443
     originRequest:
       noTLSVerify: true
+
+  # --- SSH over tunnel to admin-vm (192.168.11.10:22) ---
+  # ドリフト取り込み (2026-06-25): このエントリは live tunnel config にのみ存在し
+  # source-of-truth 未反映だった。ops/dev-ops 追加の push で誤って削除しないよう、
+  # 既存のライブ設定を逐語で取り込む (`cloudflared access ssh` / WARP 経由 SSH 用)。
+  - hostname: ssh.yagamin.net
+    service: ssh://192.168.11.10:22
 
   # --- Catch-all (must be the last entry) ---
   - service: http_status:404
