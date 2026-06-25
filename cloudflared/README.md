@@ -56,13 +56,17 @@ cloudflared/
 | `tv.yagamin.net` | icstv-web (`icstv` ns, 本番) | 公開番組表 + 内部 admin |
 | `dev-tv.yagamin.net` | icstv-web (`icstv-dev` ns) | 関係者限定 preview |
 | `dev-studio.yagamin.net` | icstv-web (`icstv-dev` ns) | **CF Access** (`studio.yagamin.net` を踏襲) |
+| `ops.yagamin.net` | icstv-web (`icstv` ns, 本番) | **CF Access** (`studio.yagamin.net` を踏襲) |
+| `dev-ops.yagamin.net` | icstv-web (`icstv-dev` ns) | **CF Access** (`studio.yagamin.net` を踏襲) |
+
+> `ops` / `dev-ops` は studio から分離した運行オペレータ向けの放送コンソール (`@icstv/ops`)。**2026-06-25 時点でバックエンド (RKE2 ingress 側の ops host ルール) は構築中**のため、整うまでは Access 認証通過後に ingress-nginx の 404 が返る (エッジ層を先行整備した状態)。
 
 上記も Dev preview と同じく `https://192.168.11.80:443` に `noTLSVerify: true` で繋ぎ、Host ヘッダは保持する (ingress 側で各ホストを直接受ける)。
 
 > **なぜ Service FQDN (`icstv-web.icstv-dev.svc.cluster.local`) を直に指さないか**
 > この tunnel は in-cluster cloudflared (RKE2 Pod) と Puter LXC (LXC 102) の双方の接続子が共有しており、CF はリクエストを両接続子へ振り分ける。`*.svc.cluster.local` は LXC 102 側から名前解決できないため、その接続子に当たったリクエストが断続的に 502 になる。両接続子から到達可能な ingress の LAN IP (`192.168.11.80:443`) を指すことで回避する (Puter の `127.0.0.1` ループ回避と同じ理由)。
 
-`dev-studio` / `studio` は CF Access (self-hosted application) で関係者のみに限定する。`dev-studio` の Access App + Policy は [`scripts/cloudflared-ensure-access.sh`](../scripts/cloudflared-ensure-access.sh) で `studio.yagamin.net` のライブ設定を複製 (踏襲) する。ポリシーは SRC から逐語コピーするため、`studio` 側を変えたら再実行で追従する。
+`dev-studio` / `studio` / `ops` / `dev-ops` は CF Access (self-hosted application) で関係者のみに限定する。各 Access App + Policy は [`scripts/cloudflared-ensure-access.sh`](../scripts/cloudflared-ensure-access.sh) で `studio.yagamin.net` のライブ設定を複製 (踏襲) する。ポリシーは SRC から逐語コピーするため、`studio` 側 (`Allow ICS-TV staff domains`) を変えたら再実行で全 DST に追従する。
 
 ## 運用手順
 
@@ -97,6 +101,15 @@ SRC_DOMAIN=studio.yagamin.net DST_DOMAIN=dev-studio.yagamin.net \
 ```
 
 App は domain 一致、Policy は name 一致で idempotent に upsert する。`studio.yagamin.net` の Access App が存在することが前提。
+
+`ops` / `dev-ops` も同じ仕組みで複製する (DST App 名は studio から自動導出すると "ICS-TV Studio (...)" になり紛らわしいので `DST_APP_NAME` を明示):
+
+```bash
+ENV_FILE=~/.env SRC_DOMAIN=studio.yagamin.net DST_DOMAIN=ops.yagamin.net \
+  DST_APP_NAME="ICS-TV Ops (ops.yagamin.net)" scripts/cloudflared-ensure-access.sh
+ENV_FILE=~/.env SRC_DOMAIN=studio.yagamin.net DST_DOMAIN=dev-ops.yagamin.net \
+  DST_APP_NAME="ICS-TV Ops (dev-ops.yagamin.net)" scripts/cloudflared-ensure-access.sh
+```
 
 ### 公開ホストを止める
 
