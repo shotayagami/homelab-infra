@@ -1,0 +1,37 @@
+---
+# Supplemental ingress allowing the icstv earthquake poller to reach the
+# Misskey web API.
+#
+# The icstv `earthquake` workload polls the unnerv.jp earthquake / EEW accounts
+# *through this instance's* Misskey API (EARTHQUAKE_MISSKEY_BASE_URL =
+# http://misskey-service.misskey.svc:3000). The chart's misskey-web-netpol only
+# admits ingress from the kube-system namespace (the ingress-nginx path), so the
+# default-deny-ingress policy silently drops the cross-namespace request and the
+# poller logs "Misskey fetch ... failed TimeoutError".
+#
+# NetworkPolicy ingress is additive across policies, so this grants the single
+# extra source without modifying the vendored chart's misskey-web-netpol.
+# Scoped to (namespace icstv AND pod app=earthquake) for least privilege.
+#
+# Source pod label `component: web` is defined by the chart's webSelector.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-earthquake-to-web
+spec:
+  podSelector:
+    matchLabels:
+      component: web
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: icstv
+          podSelector:
+            matchLabels:
+              app: earthquake
+      ports:
+        - protocol: TCP
+          port: 3000

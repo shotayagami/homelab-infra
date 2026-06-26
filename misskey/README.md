@@ -91,6 +91,10 @@ kubectl apply -f misskey/k8s/argocd/application-misskey.yaml   # misskey
 - **補助 NetworkPolicy** (`k8s/base/networkpolicy-backends.yaml`) — chart の `default-deny-ingress`
   (`podSelector:{}`) が同一 ns の PG/Meili も巻き込むため、`component: web` → PG:5432 / Meili:7700 の
   ingress を明示許可。これが無いと Misskey が自分の DB/検索に到達できない。
+- **補助 NetworkPolicy** (`k8s/base/networkpolicy-earthquake.yaml`) — `icstv` ns の `earthquake` poller が
+  本インスタンスの Misskey API (`misskey-service:3000`) 経由で unnerv.jp の地震/EEW アカウントを取得するため、
+  `(ns=icstv ∧ app=earthquake)` → web:3000 の ingress を最小権限で追加。chart の `misskey-web-netpol` は
+  `kube-system` からの ingress しか許さず、これが無いと poller が `Misskey fetch ... TimeoutError` で落ちる。
 - **`objectStorage`** — 現環境の R2 設定をそのまま流用 (bucket `yagamincom` / prefix `misskey` /
   baseUrl `files.yagamin.com`)。`endpoint`(account_id) は公開 repo に出さないため secret 注入
   (`__OBJECT_STORAGE_ENDPOINT__` を chart の initContainer が sed 置換)。

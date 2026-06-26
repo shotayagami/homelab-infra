@@ -7,4 +7,5 @@ resources:
   - meilisearch.yaml
   - networkpolicy-backends.yaml
   - networkpolicy-smtp.yaml
+  - networkpolicy-earthquake.yaml
   - cloudflared.yaml
