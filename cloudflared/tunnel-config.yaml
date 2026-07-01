@@ -127,6 +127,18 @@ ingress:
     originRequest:
       noTLSVerify: true
 
+  # --- Backoffice (管理用 UI / RKE2 ingress-nginx, CF Access protected) ---
+  # 管理用に追加された backoffice ホスト。studio / ops と同じく関係者限定で、
+  # CF Access ポリシーは studio.yagamin.net を踏襲する (scripts/cloudflared-ensure-access.sh)。
+  # Host は書き換えず保持し、上流は RKE2 ingress-nginx (192.168.11.80:443, noTLSVerify)。
+  # NOTE: 2026-06-27 時点でエッジ層 (tunnel ingress + DNS + CF Access) を先行整備した状態。
+  # backend (RKE2 ingress 側の backoffice host ルール) が整うまでは認証通過後に
+  # ingress-nginx の 404 が返る (ops と同じエッジ先行パターン)。
+  - hostname: backoffice.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+
   # --- SSH over tunnel to admin-vm (192.168.11.10:22) ---
   # ドリフト取り込み (2026-06-25): このエントリは live tunnel config にのみ存在し
   # source-of-truth 未反映だった。ops/dev-ops 追加の push で誤って削除しないよう、
