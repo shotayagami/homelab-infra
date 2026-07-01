@@ -101,6 +101,17 @@ ingress:
     originRequest:
       noTLSVerify: true
 
+  # --- ICS-TV remotion studio (映像テンプレート編集 UI / RKE2 ingress-nginx, CF Access protected) ---
+  # Remotion Studio (映像コンポジションのプレビュー/編集) を関係者限定で公開する
+  # 内部オペレータ向けツール。studio / ops と同型で CF Access ポリシーは
+  # studio.yagamin.net を踏襲する (scripts/cloudflared-ensure-access.sh)。
+  # バックエンドは icstv-web ingress の remotion.yagamin.net host ルール (icstv ns、
+  # 上流 Service icstv-remotion-studio:80)。dev 版は未整備のため本番ホストのみ。
+  - hostname: remotion.yagamin.net
+    service: https://192.168.11.80:443
+    originRequest:
+      noTLSVerify: true
+
   # --- ICS-TV deliver (業者向け納品ポータル / RKE2 ingress-nginx) ---
   # 外部の配信業者が素材を納品するための UI。studio.* / dev-studio.* と違い
   # **CF Access は付けない** — 業者がトンネル経由で到達できる必要があり、Access を
