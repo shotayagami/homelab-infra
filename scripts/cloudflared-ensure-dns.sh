@@ -44,6 +44,7 @@ DEFAULT_HOSTS=(
   dev-studio.yagamin.net
   ops.yagamin.net
   dev-ops.yagamin.net
+  remotion.yagamin.net
   deliver.yagamin.net
   dev-deliver.yagamin.net
   gitea.yagamin.net
