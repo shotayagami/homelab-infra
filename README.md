@@ -66,6 +66,7 @@
 │   ├── single-instance-rwo-rollout-deadlock.md ← 単一インスタンス + RWO PVC + 内蔵 DB の rollout デッドロック (Gitea 経験から横展開)
 │   ├── backup-strategy.md             ← 多層バックアップの俯瞰 (vzdump / CronJob / Longhorn / Velero / etcd)
 │   ├── proxmox-zabbix-monitoring.md   ← Zabbix Phase 1-6 構築記録 + 運用知見
+│   ├── update-check.md                ← RKE2/CLI バージョン更新の自動検知・通知
 │   ├── homelab-git-workflow.md        ← Git 運用ルール
 │   ├── github-post-setup.md           ← GitHub 設定の継続作業
 │   └── remaining-tasks.md             ← 残タスク一覧
@@ -80,7 +81,9 @@
 │   ├── proxmox-zabbix-apply-nextcloud-template.sh
 │   ├── proxmox-zabbix-set-host-location.sh
 │   ├── admin-vm/                      ← admin-vm 配置物
-│   │   └── pve-wrapper                   ← pct/qm/pvesh/pveum SSH ラッパー
+│   │   ├── pve-wrapper                   ← pct/qm/pvesh/pveum SSH ラッパー
+│   │   ├── update-check.sh               ← RKE2/Helm/CLI バージョン更新チェック
+│   │   └── update-check.conf.example
 │   ├── pve-host/                      ← PVE host 配置物
 │   │   ├── network-watchdog.{sh,service}     ← NIC 障害検知・段階エスカレーション
 │   │   ├── vm-health-monitor.{sh,service}    ← VM/LXC 死活監視・自動復旧
@@ -89,10 +92,12 @@
 │   ├── lxc-pg-db/                     ← LXC 106 (pg-db) 配置物
 │   │   ├── pg_backup.sh                      ← PG 日次 dump スクリプト
 │   │   └── pg_backup.cron                    ← 同 cron 登録
-│   └── systemd-units/                 ← step-ca + Cilium 経路 unit 群
+│   └── systemd-units/                 ← step-ca + Cilium 経路 + update-check unit 群
 │       ├── step-renew-nextcloud.service
 │       ├── step-renew-zabbix.service
-│       └── k8s-pod-routes.service
+│       ├── k8s-pod-routes.service
+│       ├── update-check.service              ← systemd --user oneshot (admin-vm)
+│       └── update-check.timer                ← 毎日 07:00 発火
 └── zabbix-configs/               ← Zabbix 設定スナップショット
     ├── .gitkeep
     └── README.md                       ← 配置ルール
@@ -116,6 +121,7 @@
 - **RKE2 クラスタ (インフラ層)**: [docs/rke2-cluster.md](docs/rke2-cluster.md)
 - **RKE2 ワークロード (アプリ層)**: [docs/rke2-workloads.md](docs/rke2-workloads.md)
 - **Zabbix 監視 (Phase 1-6 構築記録)**: [docs/proxmox-zabbix-monitoring.md](docs/proxmox-zabbix-monitoring.md)
+- **アップデート検知 (update-check)**: [docs/update-check.md](docs/update-check.md)
 
 ### 運用・リポジトリ
 - **Git ワークフロー**: [docs/homelab-git-workflow.md](docs/homelab-git-workflow.md)
@@ -165,6 +171,7 @@ Zabbix Admin に MFA 有効な環境では `user.login` の session が即 inval
 | [scripts/proxmox-zabbix-set-host-location.sh](scripts/proxmox-zabbix-set-host-location.sh) | Zabbix 全ホストの inventory に座標を API 一括設定 |
 | [scripts/proxmox-zabbix-apply-nextcloud-template.sh](scripts/proxmox-zabbix-apply-nextcloud-template.sh) | Phase 4-B: Nextcloud HTTP テンプレ + macros を API 適用 (Issue #1) |
 | [scripts/proxmox-deploy-zabbix-cloudflare-access.sh](scripts/proxmox-deploy-zabbix-cloudflare-access.sh) | Zabbix UI を CF Tunnel + CF Access で外部公開 (Issue #7) |
+| [scripts/admin-vm/update-check.sh](scripts/admin-vm/update-check.sh) | RKE2/Helm/CLI のバージョン更新を毎日検知し ntfy に通知（詳細: [docs/update-check.md](docs/update-check.md)） |
 
 ## 通知経路
 
@@ -187,6 +194,18 @@ Admin user の 3 media に同時配信
     └──→ Mailgun (mediatypeid=73)
             smtp.mailgun.org:465 SSL/TLS、SMTP auth
             送信先: <your-email>
+```
+
+update-check（RKE2/Helm/CLI のバージョン更新検知）は上記 Zabbix 系とは別系統で、専用トピックの ntfy にのみ通知する（詳細: [docs/update-check.md](docs/update-check.md)）:
+
+```
+update-check.timer (admin-vm, 毎日 07:00)
+    │
+    ▼
+update-check.sh check
+    │ 更新が1件以上あれば
+    ▼
+ntfy (write-only token, http://192.168.11.56/update-check)
 ```
 
 ## ロードマップ

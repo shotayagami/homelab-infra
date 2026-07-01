@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily RKE2 update check at 07:00
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

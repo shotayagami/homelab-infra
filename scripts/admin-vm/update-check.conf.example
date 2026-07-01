@@ -1,0 +1,36 @@
+# =============================================================
+# update-check 設定ファイル（サンプル）
+# =============================================================
+# このファイルを $HOME/.config/update-check/update-check.conf にコピーし、
+# 各値を実値に置き換えてください。
+#
+#   mkdir -p ~/.config/update-check
+#   cp scripts/admin-vm/update-check.conf.example ~/.config/update-check/update-check.conf
+#   chmod 700 ~/.config/update-check
+#   chmod 600 ~/.config/update-check/update-check.conf   # ← ntfy token を含むため必須
+#
+# ※このファイル自体はダミー値です。実値はリポジトリにコミットしない。
+# =============================================================
+
+# ---- システム識別ラベル（通知タイトルに表示される）----
+SYSTEM_LABEL="homelab (RKE2)"
+
+# ---- 実行バイナリのパス（admin-vm の ~/bin が PATH 済みならそのままでOK）----
+KUBECTL="kubectl"
+HELM="helm"
+
+# ---- ntfy 通知 ----
+# 発行手順（ntfy LXC 191 上、pct-wrapper 経由で実行）:
+#   PVE_HOST=root@192.168.11.12 pct exec 191 -- ntfy user add update-check
+#   PVE_HOST=root@192.168.11.12 pct exec 191 -- ntfy access update-check update-check write-only
+#   PVE_HOST=root@192.168.11.12 pct exec 191 -- ntfy token add update-check
+#
+# Zabbix のントfy media type と同様、内部通信は HTTP + Bearer token
+# （ntfy.home.yagamin.net の HTTPS は step-ca 内部 CA 署名のため、
+#   admin-vm がそのルート証明書を信頼していないと curl の証明書検証に失敗する）。
+NTFY_URL="http://192.168.11.56/update-check"
+NTFY_TOKEN="tk_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+# ---- ログ / レポート出力先（通常は変更不要）----
+LOG_FILE="$HOME/.local/state/update-check.log"
+REPORT_FILE="$HOME/.local/state/update-check-report.json"

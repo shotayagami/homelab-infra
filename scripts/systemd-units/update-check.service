@@ -1,0 +1,15 @@
+[Unit]
+Description=RKE2 cluster update check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# admin-vm の kubectl/helm/kubeseal は ~/bin、cloudflared は /usr/local/bin
+Environment=PATH=%h/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/bin/update-check.sh check
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
